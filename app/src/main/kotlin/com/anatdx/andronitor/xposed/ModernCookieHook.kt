@@ -8,6 +8,7 @@ import android.webkit.CookieManager
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.HotReloadedParam
+import io.github.libxposed.api.XposedModuleInterface.HotReloadingParam
 import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
 import java.util.concurrent.atomic.AtomicBoolean
@@ -47,6 +48,15 @@ class ModernCookieHook : XposedModule() {
         if (param.packageName != CookieBridge.TARGET_PACKAGE) return
         arm()
     }
+
+    /**
+     * Consent to being retired so the framework can hot reload us; the default
+     * implementation returns false and refuses. Nothing needs tearing down
+     * first: [CookieCapture] owns no threads, native hooks or registered
+     * callbacks, only a dedupe set and a reference to the target's Context, and
+     * the framework itself retires the Java hooks handed to [onHotReloaded].
+     */
+    override fun onHotReloading(param: HotReloadingParam): Boolean = true
 
     /**
      * Re-install hooks after a hot reload so an updated module keeps working

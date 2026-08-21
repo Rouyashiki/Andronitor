@@ -6,3 +6,7 @@ minApiVersion=101
 targetApiVersion=102
 # Only ever meaningful inside the X app; forbid applying the module elsewhere.
 staticScope=true
+# Let the framework reload the module in place when the APK is updated, so a
+# reinstall does not need the X app force-stopped. Opting in here is required;
+# onHotReloading additionally has to consent at runtime.
+autoHotReload=true
