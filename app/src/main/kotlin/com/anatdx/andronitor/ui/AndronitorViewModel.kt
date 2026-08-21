@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.anatdx.andronitor.R
 import com.anatdx.andronitor.data.AndronitorRepository
 import com.anatdx.andronitor.model.Account
 import com.anatdx.andronitor.model.AppSettings
@@ -11,6 +12,8 @@ import com.anatdx.andronitor.model.DashboardStats
 import com.anatdx.andronitor.model.SyncFetchMode
 import com.anatdx.andronitor.model.SyncProgress
 import com.anatdx.andronitor.model.TwitterUser
+import com.anatdx.andronitor.xposed.CookieInbox
+import com.anatdx.andronitor.xposed.PendingCookieStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,6 +37,7 @@ data class AndronitorUiState(
     val isBusy: Boolean = false,
     val progress: SyncProgress? = null,
     val error: String? = null,
+    val info: String? = null,
 )
 
 class AndronitorViewModel(application: Application) : AndroidViewModel(application) {
@@ -43,7 +47,43 @@ class AndronitorViewModel(application: Application) : AndroidViewModel(applicati
 
     init {
         viewModelScope.launch { loadAccounts() }
+        // Drain any cookie persisted by CookieReceiver while we weren't running.
+        viewModelScope.launch {
+            PendingCookieStore.take(getApplication())?.let { importCookie(it) }
+        }
+        // And keep draining cookies delivered live while the app is open.
+        viewModelScope.launch {
+            CookieInbox.cookies.collect { cookie -> importCookie(cookie) }
+        }
     }
+
+    /** Add the account for [cookie], or refresh it if that account already exists. */
+    private suspend fun importCookie(cookie: String) {
+        val trimmed = cookie.trim()
+        if (trimmed.isBlank()) return
+        val existingId = repository.accountIdForCookie(trimmed)
+        val importedMessage = getApplication<Application>().getString(R.string.cookie_imported)
+        if (existingId != null && _state.value.accounts.any { it.id == existingId }) {
+            val refreshed = runCatching { repository.updateAccountCookie(existingId, trimmed) }
+            if (refreshed.isSuccess) {
+                loadAccounts()
+                _state.update { it.copy(info = importedMessage) }
+            } else {
+                _state.update { it.copy(error = refreshed.exceptionOrNull()?.message) }
+            }
+            return
+        }
+        _state.update { it.copy(isBusy = true, error = null) }
+        val result = runCatching { repository.addAccount(trimmed, _state.value.settings) }
+        if (result.isSuccess) {
+            loadAccounts()
+            _state.update { it.copy(info = importedMessage) }
+        } else {
+            _state.update { it.copy(isBusy = false, error = result.exceptionOrNull()?.message) }
+        }
+    }
+
+    fun clearInfo() = _state.update { it.copy(info = null) }
 
     fun selectTab(tab: AppTab) {
         _state.update { it.copy(tab = tab, error = null) }

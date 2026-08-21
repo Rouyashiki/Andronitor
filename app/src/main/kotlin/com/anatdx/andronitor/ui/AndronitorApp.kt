@@ -6,6 +6,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -68,6 +69,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -287,6 +289,23 @@ private fun AccountsScreen(state: AndronitorUiState, viewModel: AndronitorViewMo
         }
     }
 
+    // Surface cookies imported from the X app (delivered by the Xposed hook).
+    LaunchedEffect(state.info) {
+        state.info?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.clearInfo()
+        }
+    }
+
+    fun openXApp() {
+        val launch = context.packageManager.getLaunchIntentForPackage("com.twitter.android")
+        if (launch != null) {
+            context.startActivity(launch)
+        } else {
+            Toast.makeText(context, context.getString(R.string.x_app_not_installed), Toast.LENGTH_LONG).show()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -313,6 +332,10 @@ private fun AccountsScreen(state: AndronitorUiState, viewModel: AndronitorViewMo
             onBrowserLogin = {
                 showAdd = false
                 browserLoginLauncher.launch(Intent(context, BrowserLoginActivity::class.java))
+            },
+            onImportFromX = {
+                showAdd = false
+                openXApp()
             },
             onConfirm = { cookie ->
                 viewModel.addAccount(cookie)
@@ -357,6 +380,7 @@ private fun CookieDialog(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
     onBrowserLogin: (() -> Unit)? = null,
+    onImportFromX: (() -> Unit)? = null,
 ) {
     var cookie by remember { mutableStateOf("") }
     AlertDialog(
@@ -364,6 +388,18 @@ private fun CookieDialog(
         title = { Text(title) },
         text = {
             Column {
+                if (onImportFromX != null) {
+                    Text(
+                        stringResource(R.string.import_from_x_body),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    FilledTonalButton(
+                        onClick = onImportFromX,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    ) { Text(stringResource(R.string.import_from_x)) }
+                    HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                }
                 OutlinedTextField(cookie, { cookie = it }, modifier = Modifier.fillMaxWidth(), minLines = 4, label = { Text(stringResource(R.string.cookie)) }, placeholder = { Text(hint) })
             }
         },

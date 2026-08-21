@@ -11,6 +11,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Xposed / LSPosed API (compileOnly, provided by the framework at runtime).
+        maven("https://api.xposed.info/")
     }
 }
 

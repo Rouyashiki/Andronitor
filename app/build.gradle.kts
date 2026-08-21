@@ -69,6 +69,8 @@ dependencies {
     implementation("com.squareup.moshi:moshi:1.15.2")
     implementation("com.squareup.moshi:moshi-kotlin:1.15.2")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    // Xposed API — present only when the module runs inside a hooked process; never bundled.
+    compileOnly("de.robv.android.xposed:api:82")
     ksp("androidx.room:room-compiler:2.8.4")
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")

@@ -38,6 +38,13 @@
     <string name="cookie">Cookie</string>
     <string name="save">保存</string>
     <string name="browser_login">浏览器登录</string>
+    <string name="xposed_description">直接从 X 客户端获取会话 Cookie 并添加到 Andronitor。</string>
+    <string name="import_from_x">从 X 客户端导入</string>
+    <string name="import_from_x_body">在 LSPosed 中启用 Andronitor（作用域选择 X 客户端），然后打开 X，会话 Cookie 会自动导入，无需手动粘贴。</string>
+    <string name="open_x_app">打开 X 客户端</string>
+    <string name="x_app_not_installed">此设备未安装 X 客户端。</string>
+    <string name="cookie_imported">已从 X 客户端导入会话 Cookie。</string>
+    <string name="waiting_for_x_cookie">正在等待 X 客户端……请在模块启用状态下打开 X。</string>
     <string name="cancel">取消</string>
     <string name="use_session">使用此登录</string>
     <string name="login_first_error">请先在 X 完成登录，然后再试一次。</string>

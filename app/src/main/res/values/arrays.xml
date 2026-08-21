@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- LSPosed reads this to preselect the scope for this module. -->
+    <string-array name="xposed_scope">
+        <item>com.twitter.android</item>
+    </string-array>
+</resources>

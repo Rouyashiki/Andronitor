@@ -38,6 +38,13 @@
     <string name="cookie">Cookie</string>
     <string name="save">Save</string>
     <string name="browser_login">Browser login</string>
+    <string name="xposed_description">Captures your X session cookie directly from the X app and adds it to Andronitor.</string>
+    <string name="import_from_x">Import from X app</string>
+    <string name="import_from_x_body">Enable Andronitor in LSPosed (scoped to the X app), then open X. Its session cookie is imported automatically — no manual paste needed.</string>
+    <string name="open_x_app">Open X app</string>
+    <string name="x_app_not_installed">The X app is not installed on this device.</string>
+    <string name="cookie_imported">Session cookie imported from the X app.</string>
+    <string name="waiting_for_x_cookie">Waiting for the X app… open X while the module is enabled.</string>
     <string name="cancel">Cancel</string>
     <string name="use_session">Use session</string>
     <string name="login_first_error">Log in to X first, then try again.</string>

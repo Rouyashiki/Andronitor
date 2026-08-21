@@ -12,6 +12,16 @@ It reads the account relationship lists using an X session cookie, stores local 
 - User search, profile details, avatar/banner history, and ZIP backup/restore.
 - Compose UI with light/dark system themes and phone-friendly navigation.
 
+## Xposed cookie import (optional)
+
+The Andronitor APK doubles as an Xposed/LSPosed module. When enabled, it captures the X web-session cookie directly from the official X app instead of requiring a manual paste or in-app browser login.
+
+1. Install the Andronitor APK on a device with the Xposed framework (LSPosed).
+2. In LSPosed, enable the **Andronitor** module and set its scope to the **X** app (`com.twitter.android`). Force-stop X afterward so the hook loads.
+3. In Andronitor, open **Accounts → Add account → Import from X app**, then use the X app. Once X materializes a web session (`auth_token` / `ct0` / `twid`), the cookie is forwarded to Andronitor and the account is added automatically.
+
+The hook reads only the framework `CookieManager` cookie jar for `x.com`/`twitter.com` inside the X process and broadcasts a complete cookie to Andronitor (addressed by package, guarded by a shared secret). Note: the X app authenticates natively with OAuth 1.0a and only populates a web cookie during web-content flows (e.g. login); if no such flow occurs, no cookie is captured and the manual/browser paths remain available.
+
 ## Build
 
 Open the project in Android Studio, or run:
