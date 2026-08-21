@@ -51,12 +51,18 @@ class ModernCookieHook : XposedModule() {
 
     /**
      * Consent to being retired so the framework can hot reload us; the default
-     * implementation returns false and refuses. Nothing needs tearing down
-     * first: [CookieCapture] owns no threads, native hooks or registered
-     * callbacks, only a dedupe set and a reference to the target's Context, and
-     * the framework itself retires the Java hooks handed to [onHotReloaded].
+     * implementation returns false and refuses. Hand the "already forwarded"
+     * latches to the next generation so an in-place update does not re-broadcast
+     * a cookie or account list that already reached Andronitor.
+     *
+     * Nothing needs tearing down first: [CookieCapture] owns no threads, native
+     * hooks or registered callbacks, and the framework itself retires the Java
+     * hooks handed to [onHotReloaded].
      */
-    override fun onHotReloading(param: HotReloadingParam): Boolean = true
+    override fun onHotReloading(param: HotReloadingParam): Boolean {
+        param.setSavedInstanceState(capture.saveState())
+        return true
+    }
 
     /**
      * Re-install hooks after a hot reload so an updated module keeps working
@@ -66,6 +72,7 @@ class ModernCookieHook : XposedModule() {
      * re-installs the setCookie hook and resumes capture on the next resume.
      */
     override fun onHotReloaded(param: HotReloadedParam) {
+        capture.restoreState(param.savedInstanceState)
         param.oldHookHandles.forEach { runCatching { it.unhook() } }
         armed.set(false)
         cookieHookInstalled.set(false)

@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
 import android.webkit.CookieManager
 import java.util.Collections
 import java.util.LinkedHashMap
@@ -105,5 +106,31 @@ class CookieCapture(private val log: (String) -> Unit) {
         return runCatching { context.sendBroadcast(intent) }
             .onFailure { log("broadcast ($action) failed: ${it.message}") }
             .isSuccess
+    }
+
+    /**
+     * Snapshot the "already forwarded" latches so a hot-reloaded generation does
+     * not re-broadcast a cookie or account list the previous one already sent.
+     *
+     * Everything stored here is a bootclasspath type, never an object created
+     * under the module classloader, so handing it to the next generation cannot
+     * keep the retired one strongly reachable. The Context is deliberately left
+     * behind: the new generation re-acquires it from its own hooks.
+     */
+    fun saveState(): Bundle = Bundle().apply {
+        putStringArrayList(KEY_SENT, ArrayList(sent))
+        putBoolean(KEY_ACCOUNTS_REPORTED, accountsReported)
+    }
+
+    /** Adopt the state [saveState] captured in the previous generation, if any. */
+    fun restoreState(state: Any?) {
+        val bundle = state as? Bundle ?: return
+        bundle.getStringArrayList(KEY_SENT)?.let(sent::addAll)
+        if (bundle.getBoolean(KEY_ACCOUNTS_REPORTED)) accountsReported = true
+    }
+
+    private companion object {
+        const val KEY_SENT = "sent_cookies"
+        const val KEY_ACCOUNTS_REPORTED = "accounts_reported"
     }
 }
