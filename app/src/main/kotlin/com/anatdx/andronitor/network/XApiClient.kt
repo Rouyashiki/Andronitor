@@ -133,17 +133,6 @@ class XApiClient {
         return UserPage(users.filter { it.restId.isNotEmpty() }, nextCursor)
     }
 
-    suspend fun searchUsers(query: String, cookie: String, settings: AppSettings): List<TwitterUser> {
-        val csrf = csrf(cookie)
-        val body = get(
-            "https://api.x.com/1.1/users/search.json",
-            mapOf("q" to query, "count" to "20", "include_entities" to "true"),
-            headers(cookie, csrf), settings,
-        )
-        if (body !is JSONArray) return emptyList()
-        return buildList { for (index in 0 until body.length()) add(TwitterUser.fromV1(body.getJSONObject(index))) }
-    }
-
     suspend fun refreshQueryIds(): Map<String, String> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("https://raw.githubusercontent.com/fa0311/TwitterInternalAPIDocument/refs/heads/develop/docs/json/GraphQL.json")

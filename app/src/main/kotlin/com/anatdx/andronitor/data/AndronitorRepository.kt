@@ -5,6 +5,7 @@ import android.net.Uri
 import com.anatdx.andronitor.model.Account
 import com.anatdx.andronitor.model.AppSettings
 import com.anatdx.andronitor.model.DashboardStats
+import com.anatdx.andronitor.model.SearchFilters
 import com.anatdx.andronitor.model.SyncFetchMode
 import com.anatdx.andronitor.model.SyncProgress
 import com.anatdx.andronitor.model.TwitterUser
@@ -21,6 +22,7 @@ class AndronitorRepository(context: Context) {
     private val api = XApiClient()
     private val media = MediaHistoryService(appContext, database)
     private val backup = BackupService(appContext, database, settingsStore, cookies)
+    private val searchHistory = SearchHistoryStore(appContext)
 
     fun loadSettings(): AppSettings = settingsStore.load()
 
@@ -148,10 +150,18 @@ class AndronitorRepository(context: Context) {
         database.getReports(accountId, userId)
     }
 
-    suspend fun search(accountId: String, query: String, settings: AppSettings): List<TwitterUser> = withContext(Dispatchers.IO) {
-        val cookie = cookies.getCookie(accountId) ?: return@withContext emptyList()
-        api.searchUsers(query, cookie, settings)
-    }
+    suspend fun search(accountId: String, query: String, filters: SearchFilters): List<TwitterUser> =
+        withContext(Dispatchers.IO) {
+            database.searchUsers(accountId, query, filters)
+        }
+
+    fun searchHistory(): List<String> = searchHistory.load()
+
+    fun rememberSearch(term: String): List<String> = searchHistory.add(term)
+
+    fun forgetSearch(term: String): List<String> = searchHistory.remove(term)
+
+    fun clearSearchHistory(): List<String> = searchHistory.clear()
 
     suspend fun refreshQueryIds(settings: AppSettings): AppSettings = withContext(Dispatchers.IO) {
         val ids = api.refreshQueryIds()

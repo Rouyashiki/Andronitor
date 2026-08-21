@@ -493,24 +493,6 @@ private fun CookieDialog(
 }
 
 @Composable
-private fun SearchScreen(state: AndronitorUiState, viewModel: AndronitorViewModel) {
-    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.nav_search)) }) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {
-            Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(state.searchQuery, viewModel::updateSearchQuery, Modifier.weight(1f), singleLine = true, label = { Text(stringResource(R.string.search_x_users)) }, leadingIcon = { Icon(Icons.Outlined.Search, null) })
-                Spacer(Modifier.size(8.dp))
-                FilledTonalButton(onClick = viewModel::search, enabled = !state.isBusy && state.searchQuery.isNotBlank()) { Text(stringResource(R.string.nav_search)) }
-            }
-            if (state.isBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-                items(state.searchResults, key = { it.restId }) { user -> UserRow(user) { viewModel.showUser(user) } }
-            }
-            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
-        }
-    }
-}
-
-@Composable
 private fun SettingsScreen(state: AndronitorUiState, viewModel: AndronitorViewModel) {
     var modeMenuOpen by remember { mutableStateOf(false) }
     var languageMenuOpen by remember { mutableStateOf(false) }
@@ -599,7 +581,7 @@ private fun CategoryScreen(title: String, users: List<TwitterUser>, loading: Boo
 }
 
 @Composable
-private fun UserRow(user: TwitterUser, onClick: () -> Unit) {
+internal fun UserRow(user: TwitterUser, onClick: () -> Unit) {
     Card(onClick = onClick, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             RemoteAvatar(user.avatarUrl, user.avatarLocalPath, 48.dp)

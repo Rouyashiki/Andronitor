@@ -10,6 +10,7 @@ import com.anatdx.andronitor.model.Account
 import com.anatdx.andronitor.model.AppSettings
 import com.anatdx.andronitor.model.ChangeReport
 import com.anatdx.andronitor.model.DashboardStats
+import com.anatdx.andronitor.model.SearchFilters
 import com.anatdx.andronitor.model.SyncFetchMode
 import com.anatdx.andronitor.model.SyncProgress
 import com.anatdx.andronitor.model.TwitterUser
@@ -17,6 +18,7 @@ import com.anatdx.andronitor.xposed.CookieInbox
 import com.anatdx.andronitor.xposed.DiscoveredAccountsInbox
 import com.anatdx.andronitor.xposed.DiscoveredXAccount
 import com.anatdx.andronitor.xposed.PendingCookieStore
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,6 +45,11 @@ data class AndronitorUiState(
     val snapshot: SnapshotView? = null,
     val searchQuery: String = "",
     val searchResults: List<TwitterUser> = emptyList(),
+    val searchFilters: SearchFilters = SearchFilters(),
+    val searchHistory: List<String> = emptyList(),
+    val searchSubmitted: Boolean = false,
+    val searchRunning: Boolean = false,
+    val searchError: String? = null,
     val isLoading: Boolean = true,
     val isBusy: Boolean = false,
     val progress: SyncProgress? = null,
@@ -55,8 +62,10 @@ class AndronitorViewModel(application: Application) : AndroidViewModel(applicati
     private val repository = AndronitorRepository(application)
     private val _state = MutableStateFlow(AndronitorUiState(settings = repository.loadSettings()))
     val state: StateFlow<AndronitorUiState> = _state.asStateFlow()
+    private var searchJob: Job? = null
 
     init {
+        _state.update { it.copy(searchHistory = repository.searchHistory()) }
         viewModelScope.launch { loadAccounts() }
         // Drain any cookie persisted by CookieReceiver while we weren't running.
         viewModelScope.launch {
@@ -109,7 +118,9 @@ class AndronitorViewModel(application: Application) : AndroidViewModel(applicati
 
     fun selectAccount(account: Account) {
         repository.setActiveAccount(account.id)
-        _state.update { it.copy(activeAccount = account, selectedCategory = null, users = emptyList()) }
+        _state.update {
+            it.withClearedSearch().copy(activeAccount = account, selectedCategory = null, users = emptyList())
+        }
         refreshDashboard()
     }
 
@@ -153,23 +164,61 @@ class AndronitorViewModel(application: Application) : AndroidViewModel(applicati
 
     fun closeSnapshot() = _state.update { it.copy(snapshot = null) }
 
-    fun updateSearchQuery(query: String) = _state.update { it.copy(searchQuery = query) }
+    fun updateSearchQuery(query: String) = _state.update {
+        // Clearing the box returns to the recent-searches list.
+        if (query.isBlank()) it.copy(searchQuery = query, searchSubmitted = false, searchResults = emptyList())
+        else it.copy(searchQuery = query)
+    }
 
-    fun search() {
+    fun search(term: String = _state.value.searchQuery) {
+        val query = term.trim()
+        if (query.isEmpty()) return
+        val history = repository.rememberSearch(query)
+        _state.update { it.copy(searchQuery = query, searchHistory = history, searchSubmitted = true) }
+        runSearch()
+    }
+
+    fun updateSearchFilters(filters: SearchFilters) {
+        _state.update { it.copy(searchFilters = filters) }
+        if (_state.value.searchSubmitted) runSearch()
+    }
+
+    fun removeSearchTerm(term: String) = _state.update { it.copy(searchHistory = repository.forgetSearch(term)) }
+
+    fun clearSearchHistory() = _state.update { it.copy(searchHistory = repository.clearSearchHistory()) }
+
+    private fun runSearch() {
         val account = _state.value.activeAccount ?: return
         val query = _state.value.searchQuery.trim()
-        if (query.isEmpty()) return
-        viewModelScope.launch {
-            _state.update { it.copy(isBusy = true, error = null) }
-            val result = runCatching { repository.search(account.id, query, _state.value.settings) }
+        val filters = _state.value.searchFilters
+        // A newer search supersedes whatever is in flight, so its stale result
+        // can never land on top of the current one.
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            // Search runs against the local database and must not disturb the
+            // shared isBusy/error used by sync, backup and account imports.
+            _state.update { it.copy(searchRunning = true, searchError = null) }
+            val result = runCatching { repository.search(account.id, query, filters) }
             _state.update {
                 it.copy(
                     searchResults = result.getOrDefault(emptyList()),
-                    isBusy = false,
-                    error = result.exceptionOrNull()?.message,
+                    searchRunning = false,
+                    searchError = result.exceptionOrNull()?.message,
                 )
             }
         }
+    }
+
+    /** Results are scoped to one owner, so they cannot survive an account switch. */
+    private fun AndronitorUiState.withClearedSearch(): AndronitorUiState {
+        searchJob?.cancel()
+        return copy(
+            searchQuery = "",
+            searchResults = emptyList(),
+            searchSubmitted = false,
+            searchRunning = false,
+            searchError = null,
+        )
     }
 
     fun addAccount(cookie: String) {
@@ -253,7 +302,10 @@ class AndronitorViewModel(application: Application) : AndroidViewModel(applicati
         val storedId = repository.activeAccountId()
         val active = accounts.firstOrNull { it.id == storedId } ?: accounts.firstOrNull()
         if (active != null && active.id != storedId) repository.setActiveAccount(active.id)
-        _state.update { it.copy(accounts = accounts, activeAccount = active, isLoading = false, isBusy = false) }
+        _state.update {
+            val base = if (active?.id != it.activeAccount?.id) it.withClearedSearch() else it
+            base.copy(accounts = accounts, activeAccount = active, isLoading = false, isBusy = false)
+        }
         if (active != null) refreshDashboard()
     }
 

@@ -135,6 +135,42 @@ interface AndronitorDao {
     @Query("SELECT * FROM follow_users WHERE owner_id = :ownerId AND user_id = :userId LIMIT 1")
     fun getRelation(ownerId: String, userId: String): FollowUserEntity?
 
+    /**
+     * Rows that could match [query] for the local user search. `latest_raw_json`
+     * embeds every searchable field, so this is a superset of the real matches;
+     * the exact per-field and attribute filtering happens in Kotlin against the
+     * parsed snapshot. SQLite's `lower()` only folds ASCII, so each text test is
+     * also run against the raw query for non-ASCII input.
+     */
+    @Query(
+        """
+        SELECT * FROM follow_users
+        WHERE owner_id = :ownerId
+          AND (:followerFilter IS NULL OR is_follower = :followerFilter)
+          AND (:followingFilter IS NULL OR is_following = :followingFilter)
+          AND (
+            :query = ''
+            OR user_id = :query
+            OR instr(lower(ifnull(name, '')), :loweredQuery) > 0
+            OR instr(ifnull(name, ''), :query) > 0
+            OR instr(lower(ifnull(screen_name, '')), :loweredQuery) > 0
+            OR instr(ifnull(screen_name, ''), :query) > 0
+            OR instr(lower(ifnull(bio, '')), :loweredQuery) > 0
+            OR instr(ifnull(bio, ''), :query) > 0
+            OR instr(lower(ifnull(latest_raw_json, '')), :loweredQuery) > 0
+            OR instr(ifnull(latest_raw_json, ''), :query) > 0
+          )
+        ORDER BY name COLLATE NOCASE, user_id
+        """,
+    )
+    fun searchCandidates(
+        ownerId: String,
+        query: String,
+        loweredQuery: String,
+        followerFilter: Int?,
+        followingFilter: Int?,
+    ): List<FollowUserEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun upsertRelation(relation: FollowUserEntity)
 

@@ -8,7 +8,9 @@ import com.anatdx.andronitor.model.Account
 import com.anatdx.andronitor.model.ChangeReport
 import com.anatdx.andronitor.model.ChangeType
 import com.anatdx.andronitor.model.DashboardStats
+import com.anatdx.andronitor.model.FilterState
 import com.anatdx.andronitor.model.Relation
+import com.anatdx.andronitor.model.SearchFilters
 import com.anatdx.andronitor.model.TwitterUser
 import org.json.JSONObject
 
@@ -144,6 +146,25 @@ class AndronitorDatabase(context: Context) : AutoCloseable {
 
     fun getReports(ownerId: String, userId: String): List<ChangeReport> =
         dao.getReports(ownerId, userId).map(ChangeReportEntity::toChangeReport)
+
+    /** Searches the users already synced for [ownerId]; the X search endpoint is not used. */
+    fun searchUsers(ownerId: String, query: String, filters: SearchFilters): List<TwitterUser> {
+        val trimmed = query.trim()
+        // The SQL prefilter folds case with SQLite's lower(), which is ASCII-only
+        // on some platform builds, while the Kotlin match folds the full Unicode
+        // range. Skip the text prefilter when a query could differ in a
+        // non-ASCII case fold, so the two can never disagree on a real match.
+        val prefilterable = trimmed.all { it.code < 128 } || trimmed.lowercase() == trimmed.uppercase()
+        val sqlQuery = if (prefilterable) trimmed else ""
+        val candidates = dao.searchCandidates(
+            ownerId = ownerId,
+            query = sqlQuery,
+            loweredQuery = sqlQuery.lowercase(),
+            followerFilter = filters.isFollower.asColumnValue(),
+            followingFilter = filters.isFollowing.asColumnValue(),
+        )
+        return candidates.map(FollowUserEntity::toUser).filter { filters.matches(it, trimmed) }
+    }
 
     fun getMediaRecord(remoteUrl: String): MediaRecord? = dao.getMediaRecord(remoteUrl)?.toMediaRecord()
 
@@ -355,6 +376,13 @@ private fun MediaRecord.toEntity() = MediaHistoryEntity(
 private fun String?.parseUser(): TwitterUser? = this?.let { runCatching { TwitterUser.fromJsonString(it) }.getOrNull() }
 
 private fun Boolean.asInt(): Int = if (this) 1 else 0
+
+/** Tri-state filters map onto the 0/1 relation columns; ALL drops the constraint. */
+private fun FilterState.asColumnValue(): Int? = when (this) {
+    FilterState.ALL -> null
+    FilterState.YES -> 1
+    FilterState.NO -> 0
+}
 
 data class MediaRecord(
     val id: Long,
