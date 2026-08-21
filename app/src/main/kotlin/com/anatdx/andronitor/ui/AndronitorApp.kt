@@ -95,6 +95,7 @@ import com.anatdx.andronitor.model.MediaSaveScope
 import com.anatdx.andronitor.model.SyncFetchMode
 import com.anatdx.andronitor.model.TwitterUser
 import com.anatdx.andronitor.ui.theme.AndronitorTheme
+import com.anatdx.andronitor.xposed.DiscoveredXAccount
 import com.anatdx.andronitor.xposed.XposedServiceConnection
 
 @Composable
@@ -338,9 +339,12 @@ private fun AccountsScreen(state: AndronitorUiState, viewModel: AndronitorViewMo
                 browserLoginLauncher.launch(Intent(context, BrowserLoginActivity::class.java))
             },
             onImportFromX = {
-                showAdd = false
+                // Keep the dialog open: the user goes to X, switches accounts, and
+                // returns to watch each account flip to "imported" live.
                 openXApp()
             },
+            discoveredAccounts = state.discoveredAccounts,
+            importedIds = state.accounts.map { it.id }.toSet(),
             onConfirm = { cookie ->
                 viewModel.addAccount(cookie)
                 showAdd = false
@@ -385,6 +389,8 @@ private fun CookieDialog(
     onConfirm: (String) -> Unit,
     onBrowserLogin: (() -> Unit)? = null,
     onImportFromX: (() -> Unit)? = null,
+    discoveredAccounts: List<DiscoveredXAccount> = emptyList(),
+    importedIds: Set<String> = emptySet(),
 ) {
     var cookie by remember { mutableStateOf("") }
     AlertDialog(
@@ -402,6 +408,34 @@ private fun CookieDialog(
                         onClick = onImportFromX,
                         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     ) { Text(stringResource(R.string.import_from_x)) }
+                    if (discoveredAccounts.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.x_accounts_detected, discoveredAccounts.size),
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                        discoveredAccounts.forEach { acc ->
+                            val imported = acc.id.isNotEmpty() && acc.id in importedIds
+                            Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    if (acc.screenName.isNotEmpty()) "@${acc.screenName}" else acc.id,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                Text(
+                                    stringResource(if (imported) R.string.x_account_imported else R.string.x_account_pending),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (imported) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        Text(
+                            stringResource(R.string.x_accounts_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
                     HorizontalDivider(Modifier.padding(vertical = 4.dp))
                 }
                 OutlinedTextField(cookie, { cookie = it }, modifier = Modifier.fillMaxWidth(), minLines = 4, label = { Text(stringResource(R.string.cookie)) }, placeholder = { Text(hint) })

@@ -96,6 +96,7 @@ class ModernCookieHook : XposedModule() {
         runCatching {
             hook(onResume).intercept(afterCall { chain ->
                 capture.rememberContext((chain.thisObject as? Activity)?.applicationContext)
+                capture.tryReportAccounts()
                 installCookieWriteHook()
                 capture.tryCapture()
             })

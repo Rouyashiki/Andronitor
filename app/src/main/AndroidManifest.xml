@@ -43,6 +43,7 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="com.anatdx.andronitor.action.X_COOKIE" />
+                <action android:name="com.anatdx.andronitor.action.X_ACCOUNTS" />
             </intent-filter>
         </receiver>
         <activity

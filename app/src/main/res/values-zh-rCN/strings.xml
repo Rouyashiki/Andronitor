@@ -41,6 +41,10 @@
     <string name="xposed_description">直接从 X 客户端获取会话 Cookie 并添加到 Andronitor。</string>
     <string name="import_from_x">从 X 客户端导入</string>
     <string name="import_from_x_body">在 LSPosed 中启用 Andronitor（作用域选择 X 客户端），然后打开 X，会话 Cookie 会自动导入，无需手动粘贴。</string>
+    <string name="x_accounts_detected">检测到 %1$d 个 X 账号</string>
+    <string name="x_account_imported">已导入</string>
+    <string name="x_account_pending">待导入</string>
+    <string name="x_accounts_hint">要导入待导入的账号，请在 X 里切到该账号并打开一次任意网页。</string>
     <string name="open_x_app">打开 X 客户端</string>
     <string name="x_app_not_installed">此设备未安装 X 客户端。</string>
     <string name="cookie_imported">已从 X 客户端导入会话 Cookie。</string>

@@ -13,6 +13,8 @@ import com.anatdx.andronitor.model.SyncFetchMode
 import com.anatdx.andronitor.model.SyncProgress
 import com.anatdx.andronitor.model.TwitterUser
 import com.anatdx.andronitor.xposed.CookieInbox
+import com.anatdx.andronitor.xposed.DiscoveredAccountsInbox
+import com.anatdx.andronitor.xposed.DiscoveredXAccount
 import com.anatdx.andronitor.xposed.PendingCookieStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,6 +40,7 @@ data class AndronitorUiState(
     val progress: SyncProgress? = null,
     val error: String? = null,
     val info: String? = null,
+    val discoveredAccounts: List<DiscoveredXAccount> = emptyList(),
 )
 
 class AndronitorViewModel(application: Application) : AndroidViewModel(application) {
@@ -54,6 +57,12 @@ class AndronitorViewModel(application: Application) : AndroidViewModel(applicati
         // And keep draining cookies delivered live while the app is open.
         viewModelScope.launch {
             CookieInbox.cookies.collect { cookie -> importCookie(cookie) }
+        }
+        // Track the X account list the hook reports, for the guided-import UI.
+        viewModelScope.launch {
+            DiscoveredAccountsInbox.accounts.collect { list ->
+                _state.update { it.copy(discoveredAccounts = list) }
+            }
         }
     }
 

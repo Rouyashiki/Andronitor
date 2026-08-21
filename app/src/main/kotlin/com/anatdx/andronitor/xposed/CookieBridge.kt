@@ -21,8 +21,20 @@ object CookieBridge {
     /** Broadcast action carrying a captured X web-session cookie. */
     const val ACTION_COOKIE = "com.anatdx.andronitor.action.X_COOKIE"
 
+    /** Broadcast action carrying the list of X accounts found in the X app. */
+    const val ACTION_ACCOUNTS = "com.anatdx.andronitor.action.X_ACCOUNTS"
+
     /** String extra: the full `k=v; k=v` cookie string for x.com. */
     const val EXTRA_COOKIE = "cookie"
+
+    /** String extra: JSON array `[{"id":..,"screenName":..}]` of discovered accounts. */
+    const val EXTRA_ACCOUNTS = "accounts"
+
+    /** Android AccountManager account type registered by the X app. */
+    const val X_ACCOUNT_TYPE = "com.twitter.android.auth.login"
+
+    /** AccountManager userdata key holding an account's numeric X user id. */
+    const val X_ACCOUNT_USER_ID_KEY = "account_user_id"
 
     /** String extra: shared secret guarding the broadcast. */
     const val EXTRA_SECRET = "secret"

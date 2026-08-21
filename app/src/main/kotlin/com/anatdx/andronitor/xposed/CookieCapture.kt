@@ -25,10 +25,28 @@ import java.util.LinkedHashMap
 class CookieCapture(private val log: (String) -> Unit) {
     private val sent = Collections.synchronizedSet(HashSet<String>())
     @Volatile private var appContext: Context? = null
+    @Volatile private var accountsReported = false
 
     /** Remember the first non-null application context we observe, for broadcasting. */
     fun rememberContext(context: Context?) {
         if (appContext == null && context != null) appContext = context
+    }
+
+    /**
+     * Report the X app's account list to Andronitor once, so it can show the user
+     * which accounts exist and which still need importing. Identities only — no
+     * tokens. Independent of cookie capture: it fires even when the active account
+     * has no web session yet.
+     */
+    fun tryReportAccounts() {
+        if (accountsReported) return
+        val context = appContext ?: return
+        val json = XAccountEnumerator.enumerateJson(context) ?: return
+        accountsReported = true
+        val ok = send(context, CookieBridge.ACTION_ACCOUNTS) {
+            putExtra(CookieBridge.EXTRA_ACCOUNTS, json)
+        }
+        if (ok) log("reported X account list to Andronitor") else accountsReported = false
     }
 
     /** Read the current cookie jar and, if a complete new session is present, forward it. */
@@ -62,23 +80,30 @@ class CookieCapture(private val log: (String) -> Unit) {
             sent.remove(cookie)
             return
         }
-        val intent = Intent(CookieBridge.ACTION_COOKIE).apply {
-            // Explicit component (not just setPackage): required on aggressive
-            // OEM ROMs to start Andronitor's process when it isn't running.
+        val ok = send(context, CookieBridge.ACTION_COOKIE) {
+            putExtra(CookieBridge.EXTRA_COOKIE, cookie)
+            putExtra(CookieBridge.EXTRA_SOURCE, Build.VERSION.SDK_INT.toLong())
+        }
+        if (ok) log("forwarded X session cookie to Andronitor") else sent.remove(cookie)
+    }
+
+    /**
+     * Send [action] to Andronitor's CookieReceiver, guarded by the shared secret.
+     * Uses an explicit component (not just setPackage) because aggressive OEM ROMs
+     * otherwise won't start Andronitor's process for the broadcast.
+     */
+    private inline fun send(context: Context, action: String, extras: Intent.() -> Unit): Boolean {
+        val intent = Intent(action).apply {
             component = ComponentName(
                 CookieBridge.ANDRONITOR_PACKAGE,
                 "${CookieBridge.ANDRONITOR_PACKAGE}.CookieReceiver",
             )
-            putExtra(CookieBridge.EXTRA_COOKIE, cookie)
             putExtra(CookieBridge.EXTRA_SECRET, CookieBridge.SECRET)
-            putExtra(CookieBridge.EXTRA_SOURCE, Build.VERSION.SDK_INT.toLong())
             addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+            extras()
         }
-        runCatching { context.sendBroadcast(intent) }
-            .onSuccess { log("forwarded X session cookie to Andronitor") }
-            .onFailure {
-                log("broadcast failed: ${it.message}")
-                sent.remove(cookie)
-            }
+        return runCatching { context.sendBroadcast(intent) }
+            .onFailure { log("broadcast ($action) failed: ${it.message}") }
+            .isSuccess
     }
 }

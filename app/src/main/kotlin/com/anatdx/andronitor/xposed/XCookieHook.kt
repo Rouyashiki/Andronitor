@@ -98,6 +98,7 @@ class XCookieHook : IXposedHookLoadPackage {
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         capture.rememberContext((param.thisObject as? Activity)?.applicationContext)
+                        capture.tryReportAccounts()
                         installCookieWriteHook()
                         capture.tryCapture()
                     }

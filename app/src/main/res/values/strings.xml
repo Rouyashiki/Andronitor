@@ -41,6 +41,10 @@
     <string name="xposed_description">Captures your X session cookie directly from the X app and adds it to Andronitor.</string>
     <string name="import_from_x">Import from X app</string>
     <string name="import_from_x_body">Enable Andronitor in LSPosed (scoped to the X app), then open X. Its session cookie is imported automatically — no manual paste needed.</string>
+    <string name="x_accounts_detected">%1$d X account(s) detected</string>
+    <string name="x_account_imported">Imported</string>
+    <string name="x_account_pending">Pending</string>
+    <string name="x_accounts_hint">To import a pending account, switch to it in the X app and open any web page once.</string>
     <string name="open_x_app">Open X app</string>
     <string name="x_app_not_installed">The X app is not installed on this device.</string>
     <string name="cookie_imported">Session cookie imported from the X app.</string>
