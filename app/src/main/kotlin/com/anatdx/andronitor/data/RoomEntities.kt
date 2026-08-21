@@ -198,7 +198,9 @@ interface AndronitorDao {
     @Query("SELECT * FROM change_reports WHERE owner_id = :ownerId AND change_type = :category ORDER BY timestamp DESC, id DESC")
     fun getReportsForCategory(ownerId: String, category: String): List<ChangeReportEntity>
 
-    @Query("SELECT change_type, COUNT(*) AS count FROM change_reports WHERE owner_id = :ownerId GROUP BY change_type")
+    // Distinct users, not raw rows: a person who changed N times is one entry in
+    // the category list (see getUsersForCategory), so the badge must match.
+    @Query("SELECT change_type, COUNT(DISTINCT user_id) AS count FROM change_reports WHERE owner_id = :ownerId GROUP BY change_type")
     fun getReportCounts(ownerId: String): List<ReportCount>
 
     @Query("DELETE FROM change_reports WHERE owner_id = :ownerId")

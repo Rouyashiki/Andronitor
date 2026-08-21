@@ -139,9 +139,24 @@ class AndronitorDatabase(context: Context) : AutoCloseable {
     fun getUsersForCategory(ownerId: String, category: String): List<TwitterUser> {
         if (category == "followers") return dao.getFollowers(ownerId).map(FollowUserEntity::toUser)
         if (category == "following") return dao.getFollowing(ownerId).map(FollowUserEntity::toUser)
-        return dao.getReportsForCategory(ownerId, category).mapNotNull { report ->
-            report.userSnapshotJson.parseUser() ?: dao.getRelation(ownerId, report.userId)?.toUser()
-        }
+        // change_reports is an append-only event log: a user who changed N times
+        // has N rows (query orders them newest-first). Collapse to the latest row
+        // per user — showing a person once is what the UI wants, and a duplicate
+        // id would crash the restId-keyed LazyColumn that renders this list.
+        return dao.getReportsForCategory(ownerId, category)
+            .distinctBy { it.userId }
+            .mapNotNull { report ->
+                val snapshot = report.userSnapshotJson.parseUser()
+                if (snapshot != null && !snapshot.avatarUrl.isNullOrEmpty()) return@mapNotNull snapshot
+                // The snapshot is unparseable or predates the avatar parser fix;
+                // fall back to the live relation for display fields.
+                val live = dao.getRelation(ownerId, report.userId)?.toUser()
+                when {
+                    snapshot == null -> live
+                    live != null -> snapshot.copy(avatarUrl = live.avatarUrl, avatarLocalPath = live.avatarLocalPath)
+                    else -> snapshot
+                }
+            }
     }
 
     fun getReports(ownerId: String, userId: String): List<ChangeReport> =
