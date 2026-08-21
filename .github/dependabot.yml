@@ -1,0 +1,49 @@
+version: 2
+
+updates:
+  # Gradle plugins live in the root build script, library dependencies in :app.
+  - package-ecosystem: gradle
+    directories:
+      - "/"
+      - "/app"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:20"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+    groups:
+      androidx-compose:
+        patterns:
+          - "androidx.compose*"
+      androidx:
+        patterns:
+          - "androidx.*"
+        exclude-patterns:
+          - "androidx.compose*"
+      kotlin:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "org.jetbrains.kotlinx*"
+          - "com.google.devtools.ksp*"
+    ignore:
+      # The classic rovo89 API is frozen at 82 by design: the module ships it
+      # as the legacy entry point next to modern libxposed. Bumping it is a
+      # deliberate compatibility decision, not a routine update.
+      - dependency-name: "de.robv.android.xposed:api"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:20"
+      timezone: Asia/Shanghai
+    labels:
+      - dependencies
+    groups:
+      actions:
+        patterns:
+          - "*"
