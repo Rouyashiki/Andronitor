@@ -38,9 +38,10 @@ jobs:
 
       - uses: android-actions/setup-android@v3
         with:
-          # compileSdk/targetSdk are 37; install them explicitly rather than
-          # relying on AGP's auto-download.
-          packages: "platform-tools platforms;android-37 build-tools;37.0.0"
+          # API 37 ships as minor-versioned platforms, so the package is
+          # android-37.0 rather than android-37; compileSdk = 37 resolves to
+          # that one. sdkmanager exits non-zero on an unknown package.
+          packages: "platform-tools platforms;android-37.0 build-tools;37.0.0"
 
       - uses: gradle/actions/wrapper-validation@v4
 
