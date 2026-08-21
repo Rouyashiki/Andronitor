@@ -1,0 +1,95 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      # Needed only by the tag job below, which attaches the APK to a release.
+      contents: write
+    env:
+      # The `secrets` context is not available to `if:` conditions, so resolve
+      # it once here. Pull requests from forks get no secrets; the release
+      # build still runs there as a compile check, just unsigned.
+      HAS_SIGNING: ${{ secrets.ANDRONITOR_KEYSTORE_BASE64 != '' }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          # Matches gradle/gradle-daemon-jvm.properties (toolchainVersion=21).
+          java-version: "21"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          # compileSdk/targetSdk are 37; install them explicitly rather than
+          # relying on AGP's auto-download.
+          packages: "platform-tools platforms;android-37 build-tools;37.0.0"
+
+      - uses: gradle/actions/wrapper-validation@v4
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run unit tests
+        run: ./gradlew :app:testDebugUnitTest --stacktrace
+
+      - name: Decode signing keystore
+        if: env.HAS_SIGNING == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDRONITOR_KEYSTORE_BASE64 }}
+        run: printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+
+      - name: Assemble release
+        env:
+          # app/build.gradle.kts only wires up the release signing config when
+          # all four are non-blank, so without secrets this still builds — just
+          # unsigned, which is enough to catch a broken release variant on a
+          # fork PR.
+          ANDRONITOR_KEYSTORE: ${{ runner.temp }}/release.jks
+          ANDRONITOR_KEYSTORE_PASSWORD: ${{ secrets.ANDRONITOR_KEYSTORE_PASSWORD }}
+          ANDRONITOR_KEY_ALIAS: ${{ secrets.ANDRONITOR_KEY_ALIAS }}
+          ANDRONITOR_KEY_PASSWORD: ${{ secrets.ANDRONITOR_KEY_PASSWORD }}
+        run: ./gradlew :app:assembleRelease --stacktrace
+
+      - name: Verify the release APK is signed
+        if: env.HAS_SIGNING == 'true'
+        run: |
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort | tail -1)
+          "$apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk
+
+      - name: Upload release APK
+        if: env.HAS_SIGNING == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: andronitor-release
+          # Named explicitly: an unsigned build would be app-release-unsigned.apk.
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v') && env.HAS_SIGNING == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --generate-notes \
+            app/build/outputs/apk/release/app-release.apk
+
+      - name: Remove the keystore from the runner
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"
