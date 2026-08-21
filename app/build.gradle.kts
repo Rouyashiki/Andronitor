@@ -80,6 +80,6 @@ dependencies {
     ksp("androidx.room:room-compiler:2.8.4")
     testImplementation("junit:junit:4.13.2")
     // Real org.json for local unit tests — the android.jar variant is a stub.
-    testImplementation("org.json:json:20240303")
+    testImplementation("org.json:json:20260814")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
