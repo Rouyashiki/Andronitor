@@ -74,6 +74,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -101,23 +102,61 @@ import com.anatdx.andronitor.xposed.XposedServiceConnection
 @Composable
 fun AndronitorApp(viewModel: AndronitorViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
+    // Screens are a when{} over state, so a pushed screen removes the previous
+    // one from composition; the holder keeps scroll positions alive for back.
+    val stateHolder = rememberSaveableStateHolder()
     AndronitorTheme(darkTheme = state.settings.darkTheme || isSystemInDarkTheme()) {
         when {
+            state.snapshot != null -> {
+                BackHandler { viewModel.closeSnapshot() }
+                val snapshot = state.snapshot!!
+                stateHolder.SaveableStateProvider("snapshot:${snapshot.report.id}") {
+                    ProfileScreen(
+                        user = snapshot.user,
+                        ownerId = state.activeAccount?.id,
+                        onBack = viewModel::closeSnapshot,
+                        snapshotReport = snapshot.report,
+                    )
+                }
+            }
+            state.historyUser != null -> {
+                BackHandler { viewModel.closeUserHistory() }
+                val historyUser = state.historyUser!!
+                stateHolder.SaveableStateProvider("history:${historyUser.restId}") {
+                    UserHistoryScreen(
+                        user = historyUser,
+                        reports = state.historyReports,
+                        loading = state.historyLoading,
+                        onBack = viewModel::closeUserHistory,
+                        onOpenSnapshot = viewModel::showSnapshot,
+                    )
+                }
+            }
             state.selectedUser != null -> {
                 BackHandler { viewModel.closeUser() }
-                ProfileScreen(state.selectedUser!!, viewModel::closeUser)
+                val selectedUser = state.selectedUser!!
+                stateHolder.SaveableStateProvider("profile:${selectedUser.restId}") {
+                    ProfileScreen(
+                        user = selectedUser,
+                        ownerId = state.activeAccount?.id,
+                        onBack = viewModel::closeUser,
+                        onShowHistory = viewModel::showUserHistory,
+                    )
+                }
             }
             state.selectedCategory != null -> {
                 BackHandler { viewModel.clearCategory() }
-                CategoryScreen(
-                    title = categoryTitle(state.selectedCategory),
-                    users = state.users,
-                    loading = state.isLoading,
-                    onBack = viewModel::clearCategory,
-                    onUserClick = viewModel::showUser,
-                )
+                stateHolder.SaveableStateProvider("category:${state.selectedCategory}") {
+                    CategoryScreen(
+                        title = categoryTitle(state.selectedCategory),
+                        users = state.users,
+                        loading = state.isLoading,
+                        onBack = viewModel::clearCategory,
+                        onUserClick = viewModel::showUser,
+                    )
+                }
             }
-            else -> MainScaffold(state, viewModel)
+            else -> stateHolder.SaveableStateProvider("main") { MainScaffold(state, viewModel) }
         }
     }
 }
@@ -581,34 +620,6 @@ private fun UserRow(user: TwitterUser, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ProfileScreen(user: TwitterUser, onBack: () -> Unit) {
-    Scaffold(topBar = { TopAppBar(title = { Text(user.name ?: stringResource(R.string.profile)) }, navigationIcon = { IconButton(onClick = onBack) { Text("‹", style = MaterialTheme.typography.headlineMedium) } }) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RemoteAvatar(user.avatarUrl, user.avatarLocalPath, 72.dp)
-                        Spacer(Modifier.size(14.dp))
-                        Column {
-                            Text(user.name ?: stringResource(R.string.unknown), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                            Text("@${user.screenName ?: user.restId}", color = MaterialTheme.colorScheme.primary)
-                            if (user.isVerified) Text(stringResource(R.string.verified), style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                    user.bio?.takeIf { it.isNotBlank() }?.let { Text(it) }
-                    user.location?.takeIf { it.isNotBlank() }?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
-            StatsRow(user.followersCount, user.followingCount)
-            Text(stringResource(R.string.user_id_format, user.restId), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (user.status != "normal") Text(localizedStatus(user.status), color = MaterialTheme.colorScheme.error)
-        }
-    }
-}
-
-@Composable
 private fun EmptyState(modifier: Modifier, icon: ImageVector, title: String, body: String, action: (() -> Unit)? = null) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.outline)
@@ -635,7 +646,7 @@ private fun categoryTitle(key: String?): String = when (key) {
 }
 
 @Composable
-private fun changeTypeTitle(type: ChangeType): String = stringResource(when (type) {
+internal fun changeTypeTitle(type: ChangeType): String = stringResource(when (type) {
     ChangeType.PROFILE_UPDATE -> R.string.change_profile_updates
     ChangeType.NORMAL_UNFOLLOWED -> R.string.change_unfollowed
     ChangeType.MUTUAL_UNFOLLOWED -> R.string.change_mutual_unfollowed
@@ -691,15 +702,6 @@ private fun localizedProgressText(text: String): String {
     if (resource != null) return stringResource(resource)
     val userCount = text.removeSuffix(" users").toIntOrNull()
     return if (userCount != null && text.endsWith(" users")) stringResource(R.string.progress_users_count, userCount) else text
-}
-
-@Composable
-private fun localizedStatus(status: String): String = when (status) {
-    "suspended" -> stringResource(R.string.change_suspended)
-    "deactivated" -> stringResource(R.string.change_deactivated)
-    "recovered" -> stringResource(R.string.change_recovered)
-    "temporarily_restricted" -> stringResource(R.string.change_temporarily_restricted)
-    else -> status
 }
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {

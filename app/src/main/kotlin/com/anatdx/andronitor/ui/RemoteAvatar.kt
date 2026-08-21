@@ -22,7 +22,7 @@ import coil.request.ImageRequest
 import java.io.File
 
 @Composable
-fun RemoteAvatar(url: String?, localPath: String? = null, size: Dp = 52.dp) {
+fun RemoteAvatar(url: String?, localPath: String? = null, size: Dp = 52.dp, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val model = localPath?.let { File(context.filesDir, it).takeIf(File::isFile) } ?: url
     val request = ImageRequest.Builder(context)
@@ -32,7 +32,7 @@ fun RemoteAvatar(url: String?, localPath: String? = null, size: Dp = 52.dp) {
     SubcomposeAsyncImage(
         model = request,
         contentDescription = null,
-        modifier = Modifier.size(size).clip(CircleShape),
+        modifier = modifier.size(size).clip(CircleShape),
         contentScale = ContentScale.Crop,
         loading = { AvatarPlaceholder(size) },
         error = { AvatarPlaceholder(size) },
@@ -47,4 +47,26 @@ private fun AvatarPlaceholder(size: Dp) {
     ) {
         Text("@", color = MaterialTheme.colorScheme.onPrimaryContainer, style = MaterialTheme.typography.titleMedium)
     }
+}
+
+/** Resolves the media model shown for a remote+local pair the way [RemoteAvatar] does. */
+fun resolveMediaModel(context: android.content.Context, url: String?, localPath: String?): Any? =
+    localPath?.let { File(context.filesDir, it).takeIf(File::isFile) } ?: url
+
+@Composable
+fun RemoteBanner(url: String?, localPath: String? = null, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val model = resolveMediaModel(context, url, localPath)
+    if (model == null) {
+        Box(modifier.background(MaterialTheme.colorScheme.outlineVariant))
+        return
+    }
+    SubcomposeAsyncImage(
+        model = ImageRequest.Builder(context).data(model).crossfade(false).build(),
+        contentDescription = null,
+        modifier = modifier,
+        contentScale = ContentScale.Crop,
+        loading = { Box(Modifier.background(MaterialTheme.colorScheme.outlineVariant)) },
+        error = { Box(Modifier.background(MaterialTheme.colorScheme.outlineVariant)) },
+    )
 }

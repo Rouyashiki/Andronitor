@@ -3,6 +3,7 @@ package com.anatdx.andronitor.model
 import com.squareup.moshi.Json
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import org.json.JSONArray
 import org.json.JSONObject
 
 private val domainMoshi = Moshi.Builder()
@@ -51,10 +52,24 @@ data class TwitterUser(
     val bannerLocalPath: String? = null,
     @param:Json(name = "bio")
     val bio: String? = null,
+    @param:Json(name = "bio_links")
+    val bioLinks: List<String> = emptyList(),
     @param:Json(name = "professional_category")
     val professionalCategory: String? = null,
     @param:Json(name = "location")
     val location: String? = null,
+    @param:Json(name = "pinned_tweet_id_str")
+    val pinnedTweetId: String? = null,
+    @param:Json(name = "parody_commentary_fan_label")
+    val parodyLabel: String? = null,
+    @param:Json(name = "birthdate_year")
+    val birthdateYear: String? = null,
+    @param:Json(name = "birthdate_month")
+    val birthdateMonth: String? = null,
+    @param:Json(name = "birthdate_day")
+    val birthdateDay: String? = null,
+    @param:Json(name = "automated_screen_name")
+    val automatedScreenName: String? = null,
     @param:Json(name = "joined_time")
     val joinedTime: String? = null,
     @param:Json(name = "link")
@@ -91,23 +106,36 @@ data class TwitterUser(
     fun toJsonString(): String = twitterUserAdapter.toJson(this)
 
     companion object {
-        fun fromJsonString(json: String): TwitterUser = twitterUserAdapter.fromJson(json)
-            ?: error("Invalid Twitter user JSON")
+        fun fromJsonString(json: String): TwitterUser {
+            val parsed = twitterUserAdapter.fromJson(json) ?: error("Invalid Twitter user JSON")
+            return parsed.copy(location = unwrapLegacyLocation(parsed.location))
+        }
+
+        /**
+         * Rows synced before the parser rewrite stored the GraphQL location
+         * object verbatim, e.g. {"location":"Taiwan"} — unwrap it on load.
+         */
+        private fun unwrapLegacyLocation(location: String?): String? {
+            if (location == null || !location.startsWith("{")) return location
+            return runCatching { JSONObject(location).optNullableString("location") }.getOrElse { location }
+        }
 
         fun fromV1(raw: JSONObject): TwitterUser {
             val id = raw.optString("id_str", raw.optString("id"))
             val entities = raw.optJSONObject("entities")
             val url = entities?.optJSONObject("url")?.optJSONArray("urls")
-                ?.optJSONObject(0)?.optString("expanded_url")
+                ?.optJSONObject(0)?.optNullableString("expanded_url")
+            val descriptionUrls = entities?.optJSONObject("description")?.optJSONArray("urls")
             return TwitterUser(
                 restId = id,
                 name = raw.optNullableString("name"),
                 screenName = raw.optNullableString("screen_name"),
                 avatarUrl = raw.optNullableString("profile_image_url_https"),
                 bannerUrl = raw.optNullableString("profile_banner_url"),
-                bio = raw.optNullableString("description"),
+                bio = expandBioUrls(raw.optNullableString("description"), descriptionUrls),
+                bioLinks = extractBioLinks(descriptionUrls),
                 location = raw.optNullableString("location"),
-                link = url,
+                link = url ?: raw.optNullableString("url"),
                 joinedTime = raw.optNullableString("created_at"),
                 isVerified = raw.optBoolean("verified") || raw.optBoolean("is_blue_verified"),
                 isProtected = raw.optBoolean("protected"),
@@ -125,7 +153,7 @@ data class TwitterUser(
         }
 
         fun fromGraphQl(raw: JSONObject): TwitterUser {
-            val result = raw.optJSONObject("result") ?: raw
+            val result = unwrapGraphQlUser(raw)
             if (result.optString("__typename") == "UserUnavailable") {
                 val message = result.optString("message")
                 return TwitterUser(
@@ -139,33 +167,138 @@ data class TwitterUser(
                     },
                 )
             }
-            val legacy = result.optJSONObject("legacy") ?: result
+            val legacy = result.optJSONObject("legacy") ?: JSONObject()
             val core = result.optJSONObject("core")
             val relationship = result.optJSONObject("relationship_perspectives")
                 ?: result.optJSONObject("relationship")
-            val userId = result.optString("rest_id", legacy.optString("id_str"))
+            val dmPermissions = result.optJSONObject("dm_permissions")
+            val mediaPermissions = result.optJSONObject("media_permissions")
+            val relationshipCounts = result.optJSONObject("relationship_counts")
+            val tweetCounts = result.optJSONObject("tweet_counts")
+            val actionCounts = result.optJSONObject("action_counts")
+            val profileBio = result.optJSONObject("profile_bio")
+
+            // The current web API moves entities under profile_bio while the legacy
+            // shape keeps them under legacy.entities — read whichever is populated.
+            val entities = legacy.optJSONObject("entities")?.takeIf { it.length() > 0 }
+                ?: profileBio?.optJSONObject("entities")
+            val descriptionUrls = entities?.optJSONObject("description")?.optJSONArray("urls")
+            val bio = expandBioUrls(
+                legacy.optNullableString("description") ?: profileBio?.optNullableString("description"),
+                descriptionUrls,
+            )
+            val link = entities?.optJSONObject("url")?.optJSONArray("urls")
+                ?.optJSONObject(0)?.optNullableString("expanded_url")
+                ?: legacy.optNullableString("url")
+                ?: result.optJSONObject("website")?.optNullableString("url")
+
+            val professionalCategory = result.optJSONObject("professional")?.optJSONArray("category")?.let { categories ->
+                (0 until categories.length())
+                    .mapNotNull { categories.optJSONObject(it) }
+                    .firstOrNull { it.optBoolean("display", true) }
+                    ?.optNullableString("name")
+            }
+            val birthdate = result.optJSONObject("legacy_extended_profile")?.optJSONObject("birthdate")
+            val pinnedTweetId = legacy.optJSONArray("pinned_tweet_ids_str")?.optNullableStringAt(0)
+                ?: result.optJSONObject("pinned_items")?.optJSONArray("tweet_ids_str")?.optNullableStringAt(0)
+            val automatedScreenName = result.optJSONObject("affiliates_highlighted_label")
+                ?.optJSONObject("label")?.optJSONObject("longDescription")?.optJSONArray("entities")
+                ?.optJSONObject(0)?.optJSONObject("ref")?.optJSONObject("mention_results")
+                ?.optJSONObject("result")?.optJSONObject("core")?.optNullableString("screen_name")
+
+            fun count(legacyKey: String, fallback: JSONObject?, fallbackKey: String = legacyKey): Int = when {
+                legacy.has(legacyKey) && !legacy.isNull(legacyKey) -> legacy.optInt(legacyKey)
+                fallback != null && fallback.has(fallbackKey) -> fallback.optInt(fallbackKey)
+                else -> 0
+            }
+
             return TwitterUser(
-                restId = userId,
+                restId = result.optString("rest_id", legacy.optString("id_str")),
                 name = core?.optNullableString("name") ?: legacy.optNullableString("name"),
                 screenName = core?.optNullableString("screen_name") ?: legacy.optNullableString("screen_name"),
-                avatarUrl = legacy.optNullableString("profile_image_url_https"),
-                bannerUrl = legacy.optNullableString("profile_banner_url"),
-                bio = legacy.optNullableString("description"),
-                location = legacy.optNullableString("location"),
-                joinedTime = legacy.optNullableString("created_at"),
-                isVerified = legacy.optBoolean("verified") || result.optBoolean("is_blue_verified"),
-                isProtected = legacy.optBoolean("protected"),
-                followersCount = result.optJSONObject("relationship_counts")?.optInt("followers")
-                    ?: legacy.optInt("followers_count"),
-                followingCount = result.optJSONObject("relationship_counts")?.optInt("following")
-                    ?: legacy.optInt("friends_count"),
-                statusesCount = legacy.optInt("statuses_count"),
-                listedCount = legacy.optInt("listed_count"),
-                favouritesCount = legacy.optInt("favourites_count"),
-                mediaCount = legacy.optInt("media_count"),
+                avatarUrl = result.optJSONObject("avatar")?.optNullableString("image_url")
+                    ?: legacy.optNullableString("profile_image_url_https"),
+                bannerUrl = legacy.optNullableString("profile_banner_url")
+                    ?: result.optJSONObject("banner")?.optNullableString("image_url"),
+                bio = bio,
+                bioLinks = extractBioLinks(descriptionUrls),
+                professionalCategory = professionalCategory,
+                location = result.optJSONObject("location")?.optNullableString("location")
+                    ?: legacy.optNullableString("location"),
+                pinnedTweetId = pinnedTweetId,
+                parodyLabel = result.optNullableString("parody_commentary_fan_label"),
+                birthdateYear = birthdate?.optNullableNumberOrString("year"),
+                birthdateMonth = birthdate?.optNullableNumberOrString("month"),
+                birthdateDay = birthdate?.optNullableNumberOrString("day"),
+                automatedScreenName = automatedScreenName,
+                joinedTime = core?.optNullableString("created_at") ?: legacy.optNullableString("created_at"),
+                link = link,
+                isVerified = legacy.optBoolean("verified") || result.optBoolean("is_blue_verified") ||
+                    result.optJSONObject("verification")?.optBoolean("verified") == true,
+                isProtected = legacy.optBoolean("protected") ||
+                    result.optJSONObject("privacy")?.optBoolean("protected") == true,
+                followersCount = count("followers_count", relationshipCounts, "followers"),
+                followingCount = count("friends_count", relationshipCounts, "following"),
+                statusesCount = count("statuses_count", tweetCounts, "tweets"),
+                listedCount = count("listed_count", null),
+                favouritesCount = count("favourites_count", actionCounts, "favorites_count"),
+                mediaCount = count("media_count", tweetCounts, "media_tweets"),
                 isFollowing = relationship?.optBoolean("following") ?: false,
                 isFollower = relationship?.optBoolean("followed_by") ?: false,
+                canDm = dmPermissions?.optBoolean("can_dm") ?: legacy.optBoolean("can_dm"),
+                canMediaTag = mediaPermissions?.optBoolean("can_media_tag") ?: legacy.optBoolean("can_media_tag"),
             )
+        }
+
+        /**
+         * Unwraps the GraphQL user containers (result / user_results / data.user)
+         * until reaching the node that owns `legacy` — reading counters off a
+         * wrapper is how valid profiles end up serialized as zero.
+         */
+        private fun unwrapGraphQlUser(raw: JSONObject): JSONObject {
+            var current = raw
+            repeat(8) {
+                if (current.optJSONObject("legacy") != null) return current
+                val next = current.optJSONObject("result")
+                    ?: current.optJSONObject("user_results")
+                    ?: current.optJSONObject("data")?.optJSONObject("user")
+                    ?: return current
+                current = next
+            }
+            return current
+        }
+
+        private fun extractBioLinks(urlEntities: JSONArray?): List<String> {
+            if (urlEntities == null) return emptyList()
+            return (0 until urlEntities.length())
+                .mapNotNull { urlEntities.optJSONObject(it)?.optNullableString("expanded_url") }
+        }
+
+        /**
+         * X sometimes returns a t.co URL in the description that is not
+         * byte-for-byte identical to its URL entity. First replace exact
+         * entity pairs, then any remaining t.co URLs in entity order.
+         */
+        private fun expandBioUrls(description: String?, urlEntities: JSONArray?): String? {
+            var expanded: String = description ?: return null
+            if (urlEntities == null || urlEntities.length() == 0) return description
+            val unmatched = mutableListOf<String>()
+            for (index in 0 until urlEntities.length()) {
+                val entity = urlEntities.optJSONObject(index) ?: continue
+                val shortUrl = entity.optNullableString("url")
+                val expandedUrl = entity.optNullableString("expanded_url")
+                    ?: entity.optNullableString("display_url")
+                    ?: continue
+                if (shortUrl != null && expanded.contains(shortUrl)) {
+                    expanded = expanded.replace(shortUrl, expandedUrl)
+                } else {
+                    unmatched += expandedUrl
+                }
+            }
+            expanded = Regex("https?://t\\.co/[A-Za-z0-9]+").replace(expanded) { match ->
+                if (unmatched.isEmpty()) match.value else unmatched.removeAt(0)
+            }
+            return expanded.trim()
         }
     }
 }
@@ -295,3 +428,10 @@ data class SyncProgress(
 
 private fun JSONObject.optNullableString(key: String): String? =
     if (!has(key) || isNull(key)) null else optString(key).takeIf { it.isNotEmpty() }
+
+/** Birthdate parts arrive as numbers; normalize to a display string. */
+private fun JSONObject.optNullableNumberOrString(key: String): String? =
+    if (!has(key) || isNull(key)) null else opt(key)?.toString()?.takeIf { it.isNotEmpty() }
+
+private fun JSONArray.optNullableStringAt(index: Int): String? =
+    if (index >= length() || isNull(index)) null else optString(index).takeIf { it.isNotEmpty() }

@@ -211,9 +211,33 @@ class AndronitorDatabase(context: Context) : AutoCloseable {
     }
 
     private fun profileChanged(old: TwitterUser, new: TwitterUser): Boolean =
-        old.name != new.name || old.screenName != new.screenName || old.bio != new.bio ||
-            old.avatarUrl != new.avatarUrl || old.bannerUrl != new.bannerUrl || old.location != new.location ||
+        fieldChanged(old.name, new.name) || fieldChanged(old.screenName, new.screenName) ||
+            bioChanged(old, new) ||
+            fieldChanged(old.avatarUrl, new.avatarUrl) || fieldChanged(old.bannerUrl, new.bannerUrl) ||
+            fieldChanged(old.location, new.location) ||
             old.isVerified != new.isVerified || old.isProtected != new.isProtected
+
+    /**
+     * Snapshots written by the pre-rewrite parser are missing fields it never
+     * read (avatar/banner/bio for the newer GraphQL shapes), so a null old
+     * value means "unknown", not "was empty" — reporting those as profile
+     * updates would flood every tracked user once after upgrading.
+     */
+    private fun fieldChanged(old: String?, new: String?): Boolean = old != null && old != new
+
+    private fun bioChanged(old: TwitterUser, new: TwitterUser): Boolean {
+        val oldBio = old.bio ?: return false
+        val newBio = new.bio ?: return true
+        if (oldBio == newBio) return false
+        // Old snapshots stored bios before t.co expansion; expand with the
+        // fresh entity list before comparing, otherwise the first sync after
+        // the parser rewrite reports every URL-carrying bio as updated.
+        val queue = new.bioLinks.toMutableList()
+        val expanded = Regex("https?://t\\.co/[A-Za-z0-9]+").replace(oldBio) { match ->
+            if (queue.isEmpty()) match.value else queue.removeAt(0)
+        }
+        return expanded.trim() != newBio.trim()
+    }
 }
 
 private fun Account.toEntity() = LoggedAccountEntity(

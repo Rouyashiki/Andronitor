@@ -8,6 +8,7 @@ import com.anatdx.andronitor.R
 import com.anatdx.andronitor.data.AndronitorRepository
 import com.anatdx.andronitor.model.Account
 import com.anatdx.andronitor.model.AppSettings
+import com.anatdx.andronitor.model.ChangeReport
 import com.anatdx.andronitor.model.DashboardStats
 import com.anatdx.andronitor.model.SyncFetchMode
 import com.anatdx.andronitor.model.SyncProgress
@@ -24,6 +25,9 @@ import kotlinx.coroutines.launch
 
 enum class AppTab { HOME, SEARCH, ACCOUNTS, SETTINGS }
 
+/** A historical profile snapshot opened from a user's change-report history. */
+data class SnapshotView(val user: TwitterUser, val report: ChangeReport)
+
 data class AndronitorUiState(
     val tab: AppTab = AppTab.HOME,
     val accounts: List<Account> = emptyList(),
@@ -33,6 +37,10 @@ data class AndronitorUiState(
     val users: List<TwitterUser> = emptyList(),
     val selectedCategory: String? = null,
     val selectedUser: TwitterUser? = null,
+    val historyUser: TwitterUser? = null,
+    val historyReports: List<ChangeReport> = emptyList(),
+    val historyLoading: Boolean = false,
+    val snapshot: SnapshotView? = null,
     val searchQuery: String = "",
     val searchResults: List<TwitterUser> = emptyList(),
     val isLoading: Boolean = true,
@@ -120,6 +128,30 @@ class AndronitorViewModel(application: Application) : AndroidViewModel(applicati
     fun showUser(user: TwitterUser) = _state.update { it.copy(selectedUser = user) }
 
     fun closeUser() = _state.update { it.copy(selectedUser = null) }
+
+    fun showUserHistory(user: TwitterUser) {
+        val account = _state.value.activeAccount ?: return
+        _state.update { it.copy(historyUser = user, historyReports = emptyList(), historyLoading = true) }
+        viewModelScope.launch {
+            val reports = runCatching { repository.reportsForUser(account.id, user.restId) }
+                .getOrElse { emptyList() }
+            _state.update { it.copy(historyReports = reports, historyLoading = false) }
+        }
+    }
+
+    fun closeUserHistory() = _state.update {
+        it.copy(historyUser = null, historyReports = emptyList(), historyLoading = false)
+    }
+
+    fun showSnapshot(report: ChangeReport) {
+        val user = report.userSnapshotJson
+            ?.let { json -> runCatching { TwitterUser.fromJsonString(json) }.getOrNull() }
+            ?: _state.value.historyUser
+            ?: return
+        _state.update { it.copy(snapshot = SnapshotView(user, report)) }
+    }
+
+    fun closeSnapshot() = _state.update { it.copy(snapshot = null) }
 
     fun updateSearchQuery(query: String) = _state.update { it.copy(searchQuery = query) }
 
