@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      On Android 12+ the launcher icon background follows the wallpaper-derived
+      system palette. The foreground is white line art, so a 600-tone accent
+      keeps it readable across every palette. values/colors.xml keeps the fixed
+      navy for older releases.
+    -->
+    <color name="ic_launcher_background">@android:color/system_accent1_600</color>
+</resources>
