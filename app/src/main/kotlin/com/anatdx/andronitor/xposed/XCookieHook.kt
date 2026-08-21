@@ -3,21 +3,23 @@ package com.anatdx.andronitor.xposed
 import android.app.Activity
 import android.app.Application
 import android.content.Context
-import android.content.Intent
-import android.os.Build
 import android.webkit.CookieManager
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Xposed entry point. Loaded into every hooked process; only arms itself inside
- * [CookieBridge.TARGET_PACKAGE]. It reads the framework [CookieManager] cookie
- * jar for x.com — a stable, non-obfuscated Android API — and, once all required
- * session cookies are present, broadcasts them to Andronitor exactly once per
- * distinct value.
+ * Classic (rovo89 API 82) Xposed entry point. Loaded on original Xposed, EdXposed,
+ * and legacy LSPosed via `assets/xposed_init`. Modern LSPosed ignores this class and
+ * loads [ModernCookieHook] instead (see `META-INF/xposed/java_init.list`); the two
+ * entries are mutually exclusive per process, so hooks are never installed twice.
+ *
+ * It only arms itself inside [CookieBridge.TARGET_PACKAGE]. The actual reading of the
+ * [CookieManager] cookie jar and the broadcast to Andronitor live in the shared,
+ * framework-agnostic [CookieCapture]; this class only wires up the classic hooks.
  *
  * Note on feasibility: the X app authenticates natively with OAuth 1.0a and only
  * populates the WebView cookie jar when it renders x.com web content (login,
@@ -27,10 +29,8 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
  */
 class XCookieHook : IXposedHookLoadPackage {
 
-    private val sent = java.util.Collections.synchronizedSet(HashSet<String>())
-    @Volatile private var appContext: Context? = null
-
-    private val cookieHookInstalled = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val capture = CookieCapture(::log)
+    private val cookieHookInstalled = AtomicBoolean(false)
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         if (lpparam.packageName != CookieBridge.TARGET_PACKAGE) return
@@ -51,8 +51,10 @@ class XCookieHook : IXposedHookLoadPackage {
             Context::class.java,
             object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
-                    appContext = (param.thisObject as? Application)?.applicationContext
-                        ?: param.args.getOrNull(0) as? Context
+                    capture.rememberContext(
+                        (param.thisObject as? Application)?.applicationContext
+                            ?: param.args.getOrNull(0) as? Context,
+                    )
                 }
             },
         )
@@ -72,7 +74,7 @@ class XCookieHook : IXposedHookLoadPackage {
         val concrete = runCatching { CookieManager.getInstance()::class.java }.getOrNull() ?: return
         if (!cookieHookInstalled.compareAndSet(false, true)) return
         val callback = object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) = tryCapture()
+            override fun afterHookedMethod(param: MethodHookParam) = capture.tryCapture()
         }
         val hooked = runCatching {
             XposedBridge.hookAllMethods(concrete, "setCookie", callback).size
@@ -95,65 +97,13 @@ class XCookieHook : IXposedHookLoadPackage {
                 "onResume",
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        if (appContext == null) {
-                            appContext = (param.thisObject as? Activity)?.applicationContext
-                        }
+                        capture.rememberContext((param.thisObject as? Activity)?.applicationContext)
                         installCookieWriteHook()
-                        tryCapture()
+                        capture.tryCapture()
                     }
                 },
             )
         }.onFailure { log("onResume hook failed: ${it.message}") }
-    }
-
-    private fun tryCapture() {
-        val cookie = readSessionCookie() ?: return
-        if (!CookieBridge.isComplete(cookie)) return
-        if (!sent.add(cookie)) return // already forwarded this exact value
-        broadcast(cookie)
-    }
-
-    /** Merge the cookie jars for x.com and twitter.com into one cookie string. */
-    private fun readSessionCookie(): String? {
-        val manager = runCatching { CookieManager.getInstance() }.getOrNull() ?: return null
-        val merged = LinkedHashMap<String, String>()
-        for (url in CookieBridge.COOKIE_URLS) {
-            val raw = runCatching { manager.getCookie(url) }.getOrNull().orEmpty()
-            raw.split(';').forEach { part ->
-                val key = part.substringBefore('=', "").trim()
-                val value = part.substringAfter('=', "").trim()
-                if (key.isNotEmpty() && value.isNotEmpty()) merged[key] = value
-            }
-        }
-        if (merged.isEmpty()) return null
-        return merged.entries.joinToString("; ") { "${it.key}=${it.value}" }
-    }
-
-    private fun broadcast(cookie: String) {
-        val context = appContext
-        if (context == null) {
-            log("captured a cookie but have no Context yet; will retry on next event")
-            sent.remove(cookie)
-            return
-        }
-        val intent = Intent(CookieBridge.ACTION_COOKIE).apply {
-            // Explicit component (not just setPackage): required on aggressive
-            // OEM ROMs to start Andronitor's process when it isn't running.
-            component = android.content.ComponentName(
-                CookieBridge.ANDRONITOR_PACKAGE,
-                "${CookieBridge.ANDRONITOR_PACKAGE}.CookieReceiver",
-            )
-            putExtra(CookieBridge.EXTRA_COOKIE, cookie)
-            putExtra(CookieBridge.EXTRA_SECRET, CookieBridge.SECRET)
-            putExtra(CookieBridge.EXTRA_SOURCE, Build.VERSION.SDK_INT.toLong())
-            addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
-        }
-        runCatching { context.sendBroadcast(intent) }
-            .onSuccess { log("forwarded X session cookie to Andronitor") }
-            .onFailure {
-                log("broadcast failed: ${it.message}")
-                sent.remove(cookie)
-            }
     }
 
     private fun log(message: String) = XposedBridge.log("[Andronitor] $message")

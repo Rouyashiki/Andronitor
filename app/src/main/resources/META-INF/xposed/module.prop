@@ -1,0 +1,8 @@
+# Modern libxposed module configuration (read by modern LSPosed).
+# The module name and description come from android:label / android:description;
+# the scope comes from scope.list. Legacy frameworks ignore this file and use the
+# AndroidManifest xposed meta-data + assets/xposed_init instead.
+minApiVersion=101
+targetApiVersion=102
+# Only ever meaningful inside the X app; forbid applying the module elsewhere.
+staticScope=true

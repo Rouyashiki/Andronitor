@@ -69,8 +69,14 @@ dependencies {
     implementation("com.squareup.moshi:moshi:1.15.2")
     implementation("com.squareup.moshi:moshi-kotlin:1.15.2")
     implementation("io.coil-kt:coil-compose:2.7.0")
-    // Xposed API — present only when the module runs inside a hooked process; never bundled.
+    // Xposed APIs — provided by the framework at runtime, never bundled into the APK.
+    // Classic rovo89 API 82 for original Xposed / EdXposed / legacy LSPosed.
     compileOnly("de.robv.android.xposed:api:82")
+    // Modern libxposed API for modern LSPosed (the module ships both entry points).
+    compileOnly("io.github.libxposed:api:102.0.0")
+    // Modern LSPosed service: lets the app talk to the framework (request scope,
+    // etc.). Bundled — it is a client library, not framework-provided like the API.
+    implementation("io.github.libxposed:service:102.0.0")
     ksp("androidx.room:room-compiler:2.8.4")
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")

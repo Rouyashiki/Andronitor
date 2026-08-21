@@ -95,6 +95,7 @@ import com.anatdx.andronitor.model.MediaSaveScope
 import com.anatdx.andronitor.model.SyncFetchMode
 import com.anatdx.andronitor.model.TwitterUser
 import com.anatdx.andronitor.ui.theme.AndronitorTheme
+import com.anatdx.andronitor.xposed.XposedServiceConnection
 
 @Composable
 fun AndronitorApp(viewModel: AndronitorViewModel = viewModel()) {
@@ -298,6 +299,9 @@ private fun AccountsScreen(state: AndronitorUiState, viewModel: AndronitorViewMo
     }
 
     fun openXApp() {
+        // On modern LSPosed, proactively ask the framework to scope this module to
+        // the X app so the hook actually loads there. No-op on classic frameworks.
+        XposedServiceConnection.requestXScope()
         val launch = context.packageManager.getLaunchIntentForPackage("com.twitter.android")
         if (launch != null) {
             context.startActivity(launch)
