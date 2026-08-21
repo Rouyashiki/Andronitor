@@ -34,6 +34,14 @@ The source tree is Kotlin-only and uses Jetpack Compose with a JDK 17+ build too
 
 The Android data and media stack uses OkHttp for HTTP, Room for SQLite access, Moshi for local JSON serialization, and Coil for image loading.
 
+## Upstream and credits
+
+Andronitor started as a fork of [MtFloveU/autonitor](https://github.com/MtFloveU/autonitor), a Flutter application by [@MtFloveU](https://github.com/MtFloveU). The relationship model, sync strategy, change taxonomy, and much of the interface design come from that project.
+
+This repository has since been rewritten as a native Kotlin/Compose Android app and is no longer a GitHub fork, but it remains a derivative work: it stays under the same GPLv3 license, still tracks upstream for feature parity, and credit for the original design belongs to the upstream authors.
+
+Thank you to @MtFloveU and everyone who contributed to autonitor.
+
 ## License
 
-This project is licensed under the [GNU General Public License v3.0 (GPLv3)](LICENSE).
+This project is licensed under the [GNU General Public License v3.0 (GPLv3)](LICENSE), inherited from [upstream](https://github.com/MtFloveU/autonitor).
