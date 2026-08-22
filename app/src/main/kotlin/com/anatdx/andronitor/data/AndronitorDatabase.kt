@@ -41,6 +41,23 @@ class AndronitorDatabase(context: Context) : AutoCloseable {
                 db.execSQL("CREATE UNIQUE INDEX index_media_history_remote_url ON media_history(remote_url)")
             }
         }
+
+        /**
+         * Tags every change report with the sync that produced it. Existing rows
+         * keep a null run_id, which is what retires them from the dashboard: the
+         * counts only ever match the newest run, so an upgrade resets them to the
+         * next sync's diff instead of carrying the accumulated total forward.
+         */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE change_reports ADD COLUMN run_id TEXT")
+                db.execSQL("DROP INDEX IF EXISTS idx_change_reports_owner_type")
+                db.execSQL(
+                    "CREATE INDEX idx_change_reports_owner_run_type " +
+                        "ON change_reports(owner_id, run_id, change_type)",
+                )
+            }
+        }
     }
 
     private val appContext = context.applicationContext
@@ -51,7 +68,7 @@ class AndronitorDatabase(context: Context) : AutoCloseable {
         appContext,
         AndronitorRoomDatabase::class.java,
         DATABASE_NAME,
-    ).addMigrations(MIGRATION_1_2).build()
+    ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
 
     fun getAccounts(): List<Account> = dao.getAccounts().map(LoggedAccountEntity::toAccount)
 
@@ -94,7 +111,7 @@ class AndronitorDatabase(context: Context) : AutoCloseable {
                     else -> null
                 }
                 if (type != null) reports += insertReport(
-                    ownerId, id, type.key, now, previous.user.toJsonString(),
+                    ownerId, id, type.key, now, previous.user.toJsonString(), runId,
                 )
             }
             for ((id, user) in users) {
@@ -105,12 +122,14 @@ class AndronitorDatabase(context: Context) : AutoCloseable {
                 val previous = old[id]
                 if (previous == null) {
                     reports += insertReport(
-                        ownerId, id, ChangeType.NEW_FOLLOWERS_FOLLOWING.key, now, current.toJsonString(),
+                        ownerId, id, ChangeType.NEW_FOLLOWERS_FOLLOWING.key, now, current.toJsonString(), runId,
                     )
                 } else {
-                    classifyRelationshipChange(previous, current, ownerId, id, now, reports)
+                    classifyRelationshipChange(previous, current, ownerId, id, now, runId, reports)
                     if (profileChanged(previous.user, current)) {
-                        reports += insertReport(ownerId, id, ChangeType.PROFILE_UPDATE.key, now, current.toJsonString())
+                        reports += insertReport(
+                            ownerId, id, ChangeType.PROFILE_UPDATE.key, now, current.toJsonString(), runId,
+                        )
                     }
                 }
                 dao.upsertRelation(current.toEntity(ownerId, runId))
@@ -130,20 +149,30 @@ class AndronitorDatabase(context: Context) : AutoCloseable {
         return reports
     }
 
+    /**
+     * Relationship-change counts describe the newest sync only, so each run
+     * replaces the previous run's numbers instead of adding to them. The full
+     * per-user log stays available through [getReports].
+     */
     fun getDashboardStats(ownerId: String): DashboardStats {
         val account = getAccount(ownerId)
-        val counts = dao.getReportCounts(ownerId).associate { it.changeType to it.count }
+        val runId = dao.getLatestRunId(ownerId)
+        val counts = runId
+            ?.let { dao.getReportCounts(ownerId, it).associate { row -> row.changeType to row.count } }
+            .orEmpty()
         return DashboardStats(account?.followersCount ?: 0, account?.followingCount ?: 0, counts, dao.getLastSync(ownerId))
     }
 
     fun getUsersForCategory(ownerId: String, category: String): List<TwitterUser> {
         if (category == "followers") return dao.getFollowers(ownerId).map(FollowUserEntity::toUser)
         if (category == "following") return dao.getFollowing(ownerId).map(FollowUserEntity::toUser)
-        // change_reports is an append-only event log: a user who changed N times
-        // has N rows (query orders them newest-first). Collapse to the latest row
-        // per user — showing a person once is what the UI wants, and a duplicate
-        // id would crash the restId-keyed LazyColumn that renders this list.
-        return dao.getReportsForCategory(ownerId, category)
+        // Scoped to the newest run so the list matches the dashboard badge.
+        // change_reports is an append-only event log, so even within one run a
+        // user can have several rows (query orders them newest-first). Collapse to
+        // the latest row per user — showing a person once is what the UI wants,
+        // and a duplicate id would crash the restId-keyed LazyColumn below.
+        val runId = dao.getLatestRunId(ownerId) ?: return emptyList()
+        return dao.getReportsForCategory(ownerId, runId, category)
             .distinctBy { it.userId }
             .mapNotNull { report ->
                 val snapshot = report.userSnapshotJson.parseUser()
@@ -208,6 +237,7 @@ class AndronitorDatabase(context: Context) : AutoCloseable {
         ownerId: String,
         userId: String,
         now: Long,
+        runId: String,
         reports: MutableList<ChangeReport>,
     ) {
         val wasMutual = previous.isFollower && previous.isFollowing
@@ -218,19 +248,19 @@ class AndronitorDatabase(context: Context) : AutoCloseable {
         val lostFollower = previous.isFollower && !current.isFollower
         when {
             current.status == "temporarily_restricted" -> reports += insertReport(
-                ownerId, userId, ChangeType.TEMPORARILY_RESTRICTED.key, now, current.toJsonString(),
+                ownerId, userId, ChangeType.TEMPORARILY_RESTRICTED.key, now, current.toJsonString(), runId,
             )
             previous.user.status in setOf("suspended", "deactivated") && current.status == "normal" -> reports += insertReport(
-                ownerId, userId, ChangeType.RECOVERED.key, now, current.toJsonString(),
+                ownerId, userId, ChangeType.RECOVERED.key, now, current.toJsonString(), runId,
             )
             becameMutual -> reports += insertReport(
-                ownerId, userId, ChangeType.BE_FOLLOWED_BACK.key, now, current.toJsonString(),
+                ownerId, userId, ChangeType.BE_FOLLOWED_BACK.key, now, current.toJsonString(), runId,
             )
             becameOneWay -> reports += insertReport(
-                ownerId, userId, ChangeType.ONEWAY_UNFOLLOWED.key, now, current.toJsonString(),
+                ownerId, userId, ChangeType.ONEWAY_UNFOLLOWED.key, now, current.toJsonString(), runId,
             )
             lostFollowing || lostFollower -> reports += insertReport(
-                ownerId, userId, ChangeType.NORMAL_UNFOLLOWED.key, now, current.toJsonString(),
+                ownerId, userId, ChangeType.NORMAL_UNFOLLOWED.key, now, current.toJsonString(), runId,
             )
         }
     }
@@ -241,8 +271,9 @@ class AndronitorDatabase(context: Context) : AutoCloseable {
         type: String,
         timestamp: Long,
         snapshot: String?,
+        runId: String,
     ): ChangeReport {
-        val id = dao.insertReport(ChangeReportEntity(0, ownerId, userId, type, timestamp, snapshot))
+        val id = dao.insertReport(ChangeReportEntity(0, ownerId, userId, type, timestamp, snapshot, runId))
         return ChangeReport(id, ownerId, userId, type, timestamp, snapshot)
     }
 

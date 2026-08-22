@@ -78,7 +78,12 @@ data class AccountProfileHistoryEntity(
 
 @Entity(
     tableName = "change_reports",
-    indices = [Index(value = ["owner_id", "change_type"], name = "idx_change_reports_owner_type")],
+    indices = [
+        Index(
+            value = ["owner_id", "run_id", "change_type"],
+            name = "idx_change_reports_owner_run_type",
+        ),
+    ],
 )
 data class ChangeReportEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -87,6 +92,10 @@ data class ChangeReportEntity(
     @ColumnInfo(name = "change_type") val changeType: String,
     val timestamp: Long,
     @ColumnInfo(name = "user_snapshot_json") val userSnapshotJson: String?,
+    // Which sync produced this row. The dashboard only ever shows the newest
+    // run's rows, so its counts are a diff against the previous sync rather than
+    // a running total. Null on rows written before this column existed.
+    @ColumnInfo(name = "run_id") val runId: String? = null,
 )
 
 @Entity(
@@ -195,13 +204,25 @@ interface AndronitorDao {
     @Query("SELECT * FROM change_reports WHERE owner_id = :ownerId AND user_id = :userId ORDER BY timestamp DESC")
     fun getReports(ownerId: String, userId: String): List<ChangeReportEntity>
 
-    @Query("SELECT * FROM change_reports WHERE owner_id = :ownerId AND change_type = :category ORDER BY timestamp DESC, id DESC")
-    fun getReportsForCategory(ownerId: String, category: String): List<ChangeReportEntity>
+    @Query(
+        """
+        SELECT * FROM change_reports
+        WHERE owner_id = :ownerId AND run_id = :runId AND change_type = :category
+        ORDER BY timestamp DESC, id DESC
+        """,
+    )
+    fun getReportsForCategory(ownerId: String, runId: String, category: String): List<ChangeReportEntity>
 
     // Distinct users, not raw rows: a person who changed N times is one entry in
     // the category list (see getUsersForCategory), so the badge must match.
-    @Query("SELECT change_type, COUNT(DISTINCT user_id) AS count FROM change_reports WHERE owner_id = :ownerId GROUP BY change_type")
-    fun getReportCounts(ownerId: String): List<ReportCount>
+    @Query(
+        """
+        SELECT change_type, COUNT(DISTINCT user_id) AS count FROM change_reports
+        WHERE owner_id = :ownerId AND run_id = :runId
+        GROUP BY change_type
+        """,
+    )
+    fun getReportCounts(ownerId: String, runId: String): List<ReportCount>
 
     @Query("DELETE FROM change_reports WHERE owner_id = :ownerId")
     fun deleteReports(ownerId: String)
@@ -223,6 +244,9 @@ interface AndronitorDao {
 
     @Query("SELECT timestamp FROM sync_logs WHERE owner_id = :ownerId ORDER BY timestamp DESC LIMIT 1")
     fun getLastSync(ownerId: String): Long?
+
+    @Query("SELECT run_id FROM sync_logs WHERE owner_id = :ownerId ORDER BY timestamp DESC, id DESC LIMIT 1")
+    fun getLatestRunId(ownerId: String): String?
 
     @Query("DELETE FROM sync_logs WHERE owner_id = :ownerId")
     fun deleteSyncLogs(ownerId: String)
