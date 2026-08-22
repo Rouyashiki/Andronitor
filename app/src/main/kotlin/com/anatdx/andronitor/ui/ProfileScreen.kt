@@ -8,7 +8,6 @@ package com.anatdx.andronitor.ui
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -20,6 +19,8 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,60 +29,50 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ListAlt
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
-import androidx.compose.material.icons.filled.Create
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Verified
-import androidx.compose.material.icons.outlined.AlternateEmail
-import androidx.compose.material.icons.outlined.Android
-import androidx.compose.material.icons.outlined.BusinessCenter
-import androidx.compose.material.icons.outlined.Cake
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.Code
-import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.Group
-import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.Link
-import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Mail
-import androidx.compose.material.icons.outlined.NoAccounts
-import androidx.compose.material.icons.outlined.SmartToy
-import androidx.compose.material.icons.outlined.Tag
-import androidx.compose.material.icons.outlined.TheaterComedy
-import androidx.compose.material.icons.outlined.WarningAmber
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ListAlt
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.AlternateEmail
+import androidx.compose.material.icons.rounded.Android
+import androidx.compose.material.icons.rounded.BusinessCenter
+import androidx.compose.material.icons.rounded.Cake
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Create
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Fingerprint
+import androidx.compose.material.icons.rounded.Group
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Mail
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.NoAccounts
+import androidx.compose.material.icons.rounded.PushPin
+import androidx.compose.material.icons.rounded.SmartToy
+import androidx.compose.material.icons.rounded.Tag
+import androidx.compose.material.icons.rounded.TheaterComedy
+import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -89,6 +80,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -98,6 +91,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -109,7 +103,6 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
@@ -121,11 +114,16 @@ import com.anatdx.andronitor.R
 import com.anatdx.andronitor.model.ChangeReport
 import com.anatdx.andronitor.model.ChangeType
 import com.anatdx.andronitor.model.TwitterUser
+import com.anatdx.andronitor.ui.component.AndroAlertDialog
+import com.anatdx.andronitor.ui.component.ListGroup
+import com.anatdx.andronitor.ui.component.ListGroupItem
+import com.anatdx.andronitor.ui.component.ListGroupPadding
+import com.anatdx.andronitor.ui.component.ListGroupRow
+import com.anatdx.andronitor.ui.component.WavyCircularProgress
 import org.json.JSONObject
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 
 private val VerifiedBlue = Color(0xFF1DA1F2)
@@ -142,23 +140,34 @@ fun ProfileScreen(
     var showVisit by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var viewerModel by remember { mutableStateOf<Any?>(null) }
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
+            // Titleless: the name and handle are the first thing under the banner
+            // anyway, and leaving the bar empty is what lets it stay transparent
+            // over an arbitrary user banner. It fades to a solid bar on scroll.
             TopAppBar(
-                title = { Text(user.name ?: stringResource(R.string.profile)) },
+                title = {},
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.browser_back))
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            stringResource(R.string.browser_back),
+                        )
                     }
                 },
                 actions = {
                     Box {
-                        IconButton(onClick = { menuOpen = true }) { Icon(Icons.Filled.MoreVert, null) }
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Rounded.MoreVert, null)
+                        }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             DropdownMenuItem(
                                 text = { Text("JSON") },
-                                leadingIcon = { Icon(Icons.Outlined.Code, null) },
+                                leadingIcon = { Icon(Icons.Rounded.Code, null) },
                                 onClick = {
                                     menuOpen = false
                                     showJson = true
@@ -167,13 +176,20 @@ fun ProfileScreen(
                         }
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                ),
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { padding ->
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(padding)
+                // The banner deliberately runs behind the app bar, so only the
+                // bottom inset is consumed here.
+                .padding(bottom = padding.calculateBottomPadding())
                 .verticalScroll(rememberScrollState()),
         ) {
             ProfileHeader(
@@ -183,35 +199,35 @@ fun ProfileScreen(
                 onVisit = { showVisit = true },
                 onViewImage = { viewerModel = it },
             )
-            Spacer(Modifier.height(5.dp))
             UserInfoColumn(user)
             StatusPrompts(user)
-            if (user.status !in setOf("suspended", "deactivated", "temporarily_restricted") &&
-                user.keptIdsStatus != "temporarily_restricted"
-            ) {
-                Spacer(Modifier.height(12.dp))
-            }
             MetadataRow(user, ownerId)
-            Spacer(Modifier.height(5.dp))
             StatGrid(user)
+
             user.pinnedTweetId?.let { pinned ->
-                SectionLabel(stringResource(R.string.user_content))
-                InfoTile(Icons.Filled.PushPin, stringResource(R.string.pinned_tweet_id), pinned)
+                ListGroup(title = stringResource(R.string.user_content)) {
+                    row { index, count ->
+                        InfoRow(index, count, Icons.Rounded.PushPin, stringResource(R.string.pinned_tweet_id), pinned)
+                    }
+                }
             }
-            SectionLabel(stringResource(R.string.identity))
-            InfoTile(Icons.Filled.Fingerprint, "Rest ID", user.restId)
+            ListGroup(title = stringResource(R.string.identity)) {
+                row { index, count ->
+                    InfoRow(index, count, Icons.Rounded.Fingerprint, "Rest ID", user.restId)
+                }
+            }
             snapshotReport?.let { report ->
                 Text(
-                    "${changeTypeTitle(ChangeType.fromKey(report.changeType))}\n${formatTimestamp(report.timestamp)}",
+                    "${changeTypeTitle(ChangeType.fromKey(report.changeType))}\n${formatDateTime(report.timestamp)}",
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 24.dp, horizontal = 16.dp),
+                        .padding(vertical = 24.dp, horizontal = ListGroupPadding),
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(32.dp))
         }
     }
 
@@ -232,8 +248,11 @@ private fun ProfileHeader(
     val highQualityAvatarUrl = user.avatarUrl?.replace(Regex("_(normal|bigger|400x400)"), "_400x400")
     val bannerModel = resolveMediaModel(context, user.bannerUrl, user.bannerLocalPath)
     val avatarModel = resolveMediaModel(context, highQualityAvatarUrl, user.avatarLocalPath)
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val bannerHeight = maxWidth / 3
+        // The banner also covers the status bar and the transparent app bar, so
+        // its drawn height has to grow by the top inset.
+        val bannerHeight = maxWidth / 3 + statusBar
         Column(Modifier.fillMaxWidth()) {
             RemoteBanner(
                 url = user.bannerUrl,
@@ -246,56 +265,40 @@ private fun ProfileHeader(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp, end = 16.dp)
-                    .heightIn(min = 45.dp),
+                    .padding(top = 12.dp, end = ListGroupPadding)
+                    .heightIn(min = 48.dp),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.Top,
             ) {
                 if (showHistoryButton) {
-                    FilledTonalButton(
-                        onClick = onShowHistory,
-                        modifier = Modifier.size(32.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(0.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.primary,
-                        ),
-                    ) {
-                        Icon(Icons.Outlined.History, stringResource(R.string.history), Modifier.size(20.dp))
+                    FilledTonalIconButton(onClick = onShowHistory) {
+                        Icon(Icons.Rounded.History, stringResource(R.string.history))
                     }
                     Spacer(Modifier.width(8.dp))
                 }
-                FilledTonalButton(
-                    onClick = onVisit,
-                    modifier = Modifier.height(32.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.primary,
-                    ),
-                ) {
-                    Icon(Icons.AutoMirrored.Outlined.OpenInNew, null, Modifier.size(20.dp))
-                    Spacer(Modifier.width(4.dp))
+                FilledTonalButton(onClick = onVisit) {
+                    Icon(Icons.AutoMirrored.Rounded.OpenInNew, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.visit))
                 }
             }
         }
         Surface(
             modifier = Modifier
-                .padding(start = 16.dp)
-                .offset(y = bannerHeight - 50.dp)
-                .size(90.dp),
+                .padding(start = ListGroupPadding)
+                .offset(y = bannerHeight - 52.dp)
+                .size(96.dp),
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surface,
+            color = MaterialTheme.colorScheme.background,
         ) {
-            Box(Modifier.padding(3.dp)) {
+            Box(Modifier.padding(4.dp)) {
                 RemoteAvatar(
                     url = highQualityAvatarUrl,
                     localPath = user.avatarLocalPath,
-                    size = 84.dp,
-                    modifier = Modifier.clickable(enabled = avatarModel != null) { avatarModel?.let(onViewImage) },
+                    size = 88.dp,
+                    modifier = Modifier.clickable(enabled = avatarModel != null) {
+                        avatarModel?.let(onViewImage)
+                    },
                 )
             }
         }
@@ -304,13 +307,26 @@ private fun ProfileHeader(
 
 @Composable
 private fun UserInfoColumn(user: TwitterUser) {
-    Column(Modifier.padding(horizontal = 16.dp)) {
+    Column(
+        Modifier.padding(horizontal = ListGroupPadding, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
         NameHeader(user)
-        ScreenNameRow(user)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SelectionContainer {
+                Text(
+                    "@${user.screenName ?: user.restId}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            RelationshipPills(user)
+        }
         user.automatedScreenName?.takeIf { it.isNotBlank() }?.let { AutomationLabel(it) }
         user.parodyLabel?.takeIf { it.isNotBlank() && it != "None" }?.let { ParodyLabel(it) }
         user.bio?.takeIf { it.isNotBlank() }?.let {
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(6.dp))
             BioRichText(it, user.bioLinks)
         }
     }
@@ -332,66 +348,13 @@ private fun NameHeader(user: TwitterUser) {
     val inlineContent = mapOf(
         "verified" to InlineTextContent(
             Placeholder(24.sp, 24.sp, PlaceholderVerticalAlign.TextCenter),
-        ) { Icon(Icons.Filled.Verified, stringResource(R.string.verified), tint = VerifiedBlue) },
+        ) { Icon(Icons.Rounded.Verified, stringResource(R.string.verified), tint = VerifiedBlue) },
         "protected" to InlineTextContent(
             Placeholder(20.sp, 20.sp, PlaceholderVerticalAlign.TextCenter),
-        ) { Icon(Icons.Filled.Lock, null, tint = MaterialTheme.colorScheme.onSurface) },
+        ) { Icon(Icons.Rounded.Lock, null, tint = MaterialTheme.colorScheme.onSurface) },
     )
     SelectionContainer {
-        Text(
-            text,
-            inlineContent = inlineContent,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-        )
-    }
-}
-
-@Composable
-private fun ScreenNameRow(user: TwitterUser) {
-    FlowRow(verticalArrangement = Arrangement.Center) {
-        SelectionContainer(Modifier.align(Alignment.CenterVertically)) {
-            Text(
-                "@${user.screenName ?: user.restId}",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (user.isFollower) {
-            RelationshipChip(
-                stringResource(R.string.follows_you),
-                outlined = false,
-                modifier = Modifier
-                    .align(Alignment.CenterVertically)
-                    .padding(start = 4.dp),
-            )
-        }
-        if (user.isFollowing) {
-            RelationshipChip(
-                stringResource(R.string.following),
-                outlined = true,
-                modifier = Modifier
-                    .align(Alignment.CenterVertically)
-                    .padding(start = 4.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun RelationshipChip(text: String, outlined: Boolean, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(4.dp),
-        color = if (outlined) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceContainerHighest,
-        border = if (outlined) BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant) else null,
-    ) {
-        Text(
-            text,
-            Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = if (outlined) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Text(text, inlineContent = inlineContent, style = MaterialTheme.typography.headlineSmall)
     }
 }
 
@@ -410,19 +373,25 @@ private fun AutomationLabel(automatedScreenName: String) {
         ) { append("@$automatedScreenName") }
         if (parts.size > 1) append(parts.last())
     }
-    Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Outlined.SmartToy, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.outline)
-        Spacer(Modifier.width(4.dp))
-        Text(text, style = MaterialTheme.typography.bodySmall)
-    }
+    IconLabelRow(Icons.Rounded.SmartToy) { Text(text, style = MaterialTheme.typography.bodySmall) }
 }
 
 @Composable
 private fun ParodyLabel(label: String) {
+    IconLabelRow(Icons.Rounded.TheaterComedy) {
+        Text(
+            stringResource(R.string.parody_account_format, label),
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun IconLabelRow(icon: ImageVector, content: @Composable () -> Unit) {
     Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Outlined.TheaterComedy, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.outline)
-        Spacer(Modifier.width(4.dp))
-        Text(stringResource(R.string.parody_account_format, label), style = MaterialTheme.typography.bodySmall)
+        Icon(icon, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.outline)
+        Spacer(Modifier.width(6.dp))
+        content()
     }
 }
 
@@ -485,58 +454,40 @@ private fun StatusPrompts(user: TwitterUser) {
     val prompts = buildList {
         if (user.status == "suspended") add(
             Prompt(
-                Icons.Outlined.Lock,
+                Icons.Rounded.Lock,
                 stringResource(R.string.account_suspended),
                 stringResource(R.string.account_suspended_description),
             ),
         )
         if (user.status == "deactivated") add(
             Prompt(
-                Icons.Outlined.NoAccounts,
+                Icons.Rounded.NoAccounts,
                 stringResource(R.string.account_deactivated),
                 stringResource(R.string.account_deactivated_description),
             ),
         )
         if (user.status == "temporarily_restricted" || user.keptIdsStatus == "temporarily_restricted") add(
             Prompt(
-                Icons.Outlined.WarningAmber,
+                Icons.Rounded.WarningAmber,
                 stringResource(R.string.account_temporarily_restricted),
                 stringResource(R.string.account_temporarily_restricted_description),
             ),
         )
     }
     if (prompts.isEmpty()) return
-    FlowRow(
-        Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    ListGroup {
         prompts.forEach { prompt ->
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.errorContainer,
-            ) {
-                Row(
-                    Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(prompt.icon, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            prompt.title,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            prompt.subtitle,
-                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.78f),
-                            fontSize = 12.sp,
-                        )
-                    }
-                }
+            row { index, count ->
+                ListGroupRow(
+                    index = index,
+                    count = count,
+                    title = prompt.title,
+                    summary = prompt.subtitle,
+                    icon = prompt.icon,
+                    iconTint = MaterialTheme.colorScheme.onErrorContainer,
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    titleColor = MaterialTheme.colorScheme.onErrorContainer,
+                )
             }
         }
     }
@@ -545,33 +496,44 @@ private fun StatusPrompts(user: TwitterUser) {
 @Composable
 private fun MetadataRow(user: TwitterUser, ownerId: String?) {
     FlowRow(
-        Modifier.padding(horizontal = 16.dp),
+        Modifier.padding(horizontal = ListGroupPadding, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         user.professionalCategory?.takeIf { it.isNotBlank() }?.let {
-            MetadataItem(Icons.Outlined.BusinessCenter, it)
+            MetadataItem(Icons.Rounded.BusinessCenter, it)
         }
         user.location?.takeIf { it.isNotBlank() }?.let {
-            MetadataItem(Icons.Outlined.LocationOn, it)
+            MetadataItem(Icons.Rounded.LocationOn, it)
         }
         user.link?.takeIf { it.isNotBlank() }?.let { LinkItem(it) }
         formatBirthday(user.birthdateYear, user.birthdateMonth, user.birthdateDay)?.let {
-            MetadataItem(Icons.Outlined.Cake, it)
+            MetadataItem(Icons.Rounded.Cake, it)
         }
         user.joinedTime?.takeIf { it.isNotBlank() }?.let {
-            MetadataItem(Icons.Outlined.CalendarMonth, stringResource(R.string.joined_format, formatJoinedTime(it)))
+            MetadataItem(
+                Icons.Rounded.CalendarMonth,
+                stringResource(R.string.joined_format, formatJoinedTime(it)),
+            )
         }
         if (ownerId != null && user.restId != ownerId) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    Icons.Outlined.Mail, null, Modifier.size(16.dp),
-                    tint = if (user.canDm) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outlineVariant,
+                    Icons.Rounded.Mail, null, Modifier.size(16.dp),
+                    tint = if (user.canDm) {
+                        MaterialTheme.colorScheme.tertiary
+                    } else {
+                        MaterialTheme.colorScheme.outlineVariant
+                    },
                 )
-                Spacer(Modifier.width(2.dp))
+                Spacer(Modifier.width(4.dp))
                 Icon(
-                    Icons.Outlined.Tag, null, Modifier.size(16.dp),
-                    tint = if (user.canMediaTag) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outlineVariant,
+                    Icons.Rounded.Tag, null, Modifier.size(16.dp),
+                    tint = if (user.canMediaTag) {
+                        MaterialTheme.colorScheme.tertiary
+                    } else {
+                        MaterialTheme.colorScheme.outlineVariant
+                    },
                 )
             }
         }
@@ -584,7 +546,11 @@ private fun MetadataItem(icon: ImageVector, text: String) {
         Icon(icon, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(4.dp))
         SelectionContainer {
-            Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -593,12 +559,14 @@ private fun MetadataItem(icon: ImageVector, text: String) {
 private fun LinkItem(url: String) {
     val primary = MaterialTheme.colorScheme.primary
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Outlined.Link, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(Icons.Rounded.Link, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(4.dp))
         SelectionContainer {
             Text(
                 buildAnnotatedString {
-                    withLink(LinkAnnotation.Url(url, TextLinkStyles(SpanStyle(color = primary)))) { append(url) }
+                    withLink(LinkAnnotation.Url(url, TextLinkStyles(SpanStyle(color = primary)))) {
+                        append(url)
+                    }
                 },
                 style = MaterialTheme.typography.bodyMedium,
             )
@@ -611,73 +579,78 @@ private fun StatGrid(user: TwitterUser) {
     data class StatItem(val icon: ImageVector, val label: String, val value: Int)
 
     val items = listOf(
-        StatItem(Icons.Outlined.Group, stringResource(R.string.following), user.followingCount),
-        StatItem(Icons.Filled.Group, stringResource(R.string.followers), user.followersCount),
-        StatItem(Icons.Filled.Create, stringResource(R.string.tweets), user.statusesCount),
-        StatItem(Icons.Filled.Image, stringResource(R.string.media_count), user.mediaCount),
-        StatItem(Icons.Filled.Favorite, stringResource(R.string.likes), user.favouritesCount),
-        StatItem(Icons.AutoMirrored.Filled.ListAlt, stringResource(R.string.listed_count), user.listedCount),
+        StatItem(Icons.Rounded.Group, stringResource(R.string.following), user.followingCount),
+        StatItem(Icons.Rounded.Group, stringResource(R.string.followers), user.followersCount),
+        StatItem(Icons.Rounded.Create, stringResource(R.string.tweets), user.statusesCount),
+        StatItem(Icons.Rounded.Image, stringResource(R.string.media_count), user.mediaCount),
+        StatItem(Icons.Rounded.Favorite, stringResource(R.string.likes), user.favouritesCount),
+        StatItem(Icons.AutoMirrored.Rounded.ListAlt, stringResource(R.string.listed_count), user.listedCount),
     )
-    Surface(
+    FlowRow(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+            .padding(horizontal = ListGroupPadding, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        maxItemsInEachRow = 3,
     ) {
-        FlowRow(
-            Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp, horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            items.forEach { item ->
+        items.forEach { item ->
+            Surface(
+                Modifier.weight(1f),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainer,
+            ) {
                 Column(
-                    Modifier
-                        .width(100.dp)
-                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                    Modifier.padding(vertical = 14.dp, horizontal = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(item.icon, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            item.value.toString(),
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            softWrap = false,
-                            autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 16.sp, stepSize = 0.5.sp),
-                        )
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    Text(item.label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(
+                        item.icon,
+                        null,
+                        Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        item.value.toString(),
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        softWrap = false,
+                        autoSize = TextAutoSize.StepBased(
+                            minFontSize = 9.sp,
+                            maxFontSize = 18.sp,
+                            stepSize = 0.5.sp,
+                        ),
+                    )
+                    Text(
+                        item.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
                 }
             }
         }
     }
 }
 
+/** A labelled, selectable identifier inside a list group. */
 @Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text,
-        Modifier.padding(start = 16.dp, top = 4.dp),
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.Bold,
-    )
-}
-
-@Composable
-private fun InfoTile(icon: ImageVector, title: String, value: String) {
-    ListItem(
-        leadingContent = { Icon(icon, null, tint = MaterialTheme.colorScheme.primary) },
-        headlineContent = { Text(title) },
-        supportingContent = { SelectionContainer { Text(value) } },
-    )
+private fun InfoRow(index: Int, count: Int, icon: ImageVector, title: String, value: String) {
+    ListGroupItem(index, count) {
+        Icon(icon, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            SelectionContainer {
+                Text(
+                    value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -693,7 +666,8 @@ private fun ProfileJsonSheet(user: TwitterUser, onDismiss: () -> Unit) {
         Column(
             Modifier
                 .fillMaxHeight(0.85f)
-                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                .padding(horizontal = ListGroupPadding)
+                .padding(bottom = ListGroupPadding),
         ) {
             Text(
                 "JSON",
@@ -706,7 +680,7 @@ private fun ProfileJsonSheet(user: TwitterUser, onDismiss: () -> Unit) {
                 Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                shape = MaterialTheme.shapes.large,
                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
             ) {
                 SelectionContainer {
@@ -714,7 +688,7 @@ private fun ProfileJsonSheet(user: TwitterUser, onDismiss: () -> Unit) {
                         pretty,
                         Modifier
                             .verticalScroll(rememberScrollState())
-                            .padding(12.dp),
+                            .padding(16.dp),
                         fontFamily = FontFamily.Monospace,
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -723,13 +697,15 @@ private fun ProfileJsonSheet(user: TwitterUser, onDismiss: () -> Unit) {
             }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = {
-                    clipboard.setText(AnnotatedString(pretty))
-                    Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
-                    onDismiss()
-                }) {
-                    Icon(Icons.Outlined.ContentCopy, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
+                TextButton(
+                    onClick = {
+                        clipboard.setText(AnnotatedString(pretty))
+                        Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                        onDismiss()
+                    },
+                ) {
+                    Icon(Icons.Rounded.ContentCopy, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.copy))
                 }
             }
@@ -746,37 +722,48 @@ private fun VisitDialog(user: TwitterUser, onDismiss: () -> Unit) {
     }
 
     val screenName = user.screenName?.takeIf { it.isNotBlank() }
-    AlertDialog(
+    AndroAlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.AutoMirrored.Outlined.OpenInNew, null) },
+        icon = { Icon(Icons.AutoMirrored.Rounded.OpenInNew, null) },
         title = { Text(stringResource(R.string.visit)) },
         text = {
-            Column {
-                val itemColors = ListItemDefaults.colors(containerColor = Color.Transparent)
+            ListGroup(horizontalPadding = 0.dp) {
                 if (screenName != null) {
-                    ListItem(
-                        leadingContent = { Icon(Icons.Outlined.Android, null) },
-                        headlineContent = { Text(stringResource(R.string.open_in_app)) },
-                        supportingContent = { Text("twitter://user?screen_name=$screenName", maxLines = 2) },
-                        colors = itemColors,
-                        modifier = Modifier.clickable { open("twitter://user?screen_name=$screenName") },
-                    )
-                    ListItem(
-                        leadingContent = { Icon(Icons.Outlined.AlternateEmail, null) },
-                        headlineContent = { Text(stringResource(R.string.browser_via_screen_name)) },
-                        supportingContent = { Text("@$screenName", maxLines = 1) },
-                        colors = itemColors,
-                        modifier = Modifier.clickable { open("https://x.com/$screenName") },
-                    )
+                    row { index, count ->
+                        ListGroupRow(
+                            index = index,
+                            count = count,
+                            title = stringResource(R.string.open_in_app),
+                            summary = "twitter://user?screen_name=$screenName",
+                            icon = Icons.Rounded.Android,
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            onClick = { open("twitter://user?screen_name=$screenName") },
+                        )
+                    }
+                    row { index, count ->
+                        ListGroupRow(
+                            index = index,
+                            count = count,
+                            title = stringResource(R.string.browser_via_screen_name),
+                            summary = "@$screenName",
+                            icon = Icons.Rounded.AlternateEmail,
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            onClick = { open("https://x.com/$screenName") },
+                        )
+                    }
                 }
                 if (user.restId.isNotEmpty()) {
-                    ListItem(
-                        leadingContent = { Icon(Icons.Filled.Fingerprint, null) },
-                        headlineContent = { Text(stringResource(R.string.browser_via_rest_id)) },
-                        supportingContent = { Text("ID: ${user.restId}", maxLines = 1) },
-                        colors = itemColors,
-                        modifier = Modifier.clickable { open("https://x.com/intent/user?user_id=${user.restId}") },
-                    )
+                    row { index, count ->
+                        ListGroupRow(
+                            index = index,
+                            count = count,
+                            title = stringResource(R.string.browser_via_rest_id),
+                            summary = "ID: ${user.restId}",
+                            icon = Icons.Rounded.Fingerprint,
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            onClick = { open("https://x.com/intent/user?user_id=${user.restId}") },
+                        )
+                    }
                 }
             }
         },
@@ -803,71 +790,12 @@ private fun FullScreenImageViewer(model: Any, onDismiss: () -> Unit) {
                 model = model,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
-                loading = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LinearProgressIndicator() } },
-            )
-        }
-    }
-}
-
-@Composable
-fun UserHistoryScreen(
-    user: TwitterUser,
-    reports: List<ChangeReport>,
-    loading: Boolean,
-    onBack: () -> Unit,
-    onOpenSnapshot: (ChangeReport) -> Unit,
-) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("${stringResource(R.string.history)} · @${user.screenName ?: user.restId}") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.browser_back))
+                loading = {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        WavyCircularProgress()
                     }
                 },
             )
-        },
-    ) { padding ->
-        when {
-            loading -> LinearProgressIndicator(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(padding),
-            )
-            reports.isEmpty() -> Box(
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    stringResource(R.string.no_history_found),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            else -> LazyColumn(
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(reports, key = { it.id }) { report ->
-                    Card(
-                        onClick = { onOpenSnapshot(report) },
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                    ) {
-                        ListItem(
-                            leadingContent = { Icon(Icons.Outlined.History, null) },
-                            headlineContent = { Text(changeTypeTitle(ChangeType.fromKey(report.changeType))) },
-                            supportingContent = { Text(formatTimestamp(report.timestamp)) },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        )
-                    }
-                }
-            }
         }
     }
 }
@@ -877,9 +805,6 @@ internal fun formatJoinedTime(raw: String): String = runCatching {
     val parsed = SimpleDateFormat("EEE MMM dd HH:mm:ss Z yyyy", Locale.US).parse(raw)
     if (parsed == null) raw else DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM).format(parsed)
 }.getOrDefault(raw)
-
-private fun formatTimestamp(timestamp: Long): String =
-    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(timestamp))
 
 internal fun formatBirthday(year: String?, month: String?, day: String?): String? {
     val y = year?.toIntOrNull()

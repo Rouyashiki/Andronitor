@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!--
+      Launch-window theme only. Everything on screen is Compose, and the system
+      bar appearance is driven by AndronitorTheme's enableEdgeToEdge call so the
+      user's theme choice wins even when it disagrees with the system one.
+    -->
     <style name="Theme.Andronitor" parent="android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:fontFamily">sans</item>
         <item name="android:windowActionModeOverlay">true</item>
-        <item name="android:colorAccent">#1A324C</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>

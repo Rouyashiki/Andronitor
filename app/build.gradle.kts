@@ -19,6 +19,12 @@ android {
     namespace = "com.anatdx.andronitor"
     compileSdk = 37
 
+    // The About row reads the version from BuildConfig so it cannot drift from
+    // the value declared below.
+    buildFeatures {
+        buildConfig = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -59,7 +65,9 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.compose.material3:material3:1.4.0")
+    // Overrides the BOM: Material 3 Expressive's wavy progress indicators,
+    // segmented list-group shapes and FAB menu only exist on the 1.5.0 line.
+    implementation("androidx.compose.material3:material3:1.5.0-alpha25")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
     implementation("androidx.room:room-runtime:2.8.4")

@@ -347,6 +347,7 @@ data class DashboardStats(
 
 enum class SyncFetchMode { FAST, EXPERT, FASTEST }
 enum class MediaSaveScope { ALL, FOLLOWING_ONLY, MUTUAL_ONLY }
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 data class AppSettings(
     val apiRequestMode: String = "dio",
@@ -358,7 +359,8 @@ data class AppSettings(
     val syncFetchMode: SyncFetchMode = SyncFetchMode.FAST,
     val avatarQualityHigh: Boolean = false,
     val historyLimit: Int = 5,
-    val darkTheme: Boolean = false,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val dynamicColor: Boolean = true,
     val language: String = "system",
     val customQueryIds: Map<String, String> = emptyMap(),
 ) {
@@ -380,7 +382,11 @@ data class AppSettings(
         syncFetchMode = syncFetchMode.name,
         avatarQualityHigh = avatarQualityHigh,
         historyLimit = historyLimit,
-        darkTheme = darkTheme,
+        themeMode = themeMode.name,
+        // Mirrored so the field keeps matching themeMode for anyone still
+        // reading the pre-themeMode payload (older builds, older backups).
+        darkTheme = themeMode == ThemeMode.DARK,
+        dynamicColor = dynamicColor,
         language = language,
         customQueryIds = customQueryIds,
     )
@@ -396,7 +402,9 @@ private data class AppSettingsPayload(
     val syncFetchMode: String = "FAST",
     val avatarQualityHigh: Boolean = false,
     val historyLimit: Int = 5,
+    val themeMode: String? = null,
     val darkTheme: Boolean = false,
+    val dynamicColor: Boolean = true,
     val language: String = "system",
     val customQueryIds: Map<String, String> = emptyMap(),
 ) {
@@ -410,7 +418,11 @@ private data class AppSettingsPayload(
         syncFetchMode = runCatching { SyncFetchMode.valueOf(syncFetchMode) }.getOrDefault(SyncFetchMode.FAST),
         avatarQualityHigh = avatarQualityHigh,
         historyLimit = historyLimit.coerceAtLeast(1),
-        darkTheme = darkTheme,
+        // A payload written before themeMode existed only knew "dark on/off",
+        // so fall back to that flag rather than resetting the user to system.
+        themeMode = themeMode?.let { mode -> runCatching { ThemeMode.valueOf(mode) }.getOrNull() }
+            ?: if (darkTheme) ThemeMode.DARK else ThemeMode.SYSTEM,
+        dynamicColor = dynamicColor,
         language = language,
         customQueryIds = customQueryIds,
     )

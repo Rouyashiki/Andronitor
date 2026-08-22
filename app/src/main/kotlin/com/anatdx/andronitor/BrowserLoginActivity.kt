@@ -1,27 +1,55 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.anatdx.andronitor
 
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
+import android.graphics.Color as AndroidColor
 import android.os.Build
 import android.os.Bundle
-import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.ProgressBar
-import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.viewinterop.AndroidView
+import com.anatdx.andronitor.data.SettingsStore
+import com.anatdx.andronitor.ui.component.WavyLinearProgress
+import com.anatdx.andronitor.ui.theme.AndronitorTheme
 
 class BrowserLoginActivity : ComponentActivity() {
     private lateinit var webView: WebView
-    private lateinit var progress: ProgressBar
-    private lateinit var error: TextView
+    private var loadProgress by mutableIntStateOf(0)
+    private var errorMessage by mutableStateOf<String?>(null)
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocale.wrap(newBase))
@@ -30,21 +58,16 @@ class BrowserLoginActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_browser_login)
 
-        webView = findViewById(R.id.login_web_view)
-        progress = findViewById(R.id.login_progress)
-        error = findViewById(R.id.login_error)
-
-        findViewById<View>(R.id.login_back).setOnClickListener { goBackOrFinish() }
-        findViewById<View>(R.id.login_use_session).setOnClickListener { returnSession() }
-
+        webView = WebView(this)
         val cookieManager = CookieManager.getInstance().apply {
             setAcceptCookie(true)
             setAcceptThirdPartyCookies(webView, true)
         }
 
-        webView.setBackgroundColor(Color.WHITE)
+        // X's login flow is a light-themed web page, so the WebView keeps a white
+        // backdrop regardless of the app theme.
+        webView.setBackgroundColor(AndroidColor.WHITE)
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -75,8 +98,7 @@ class BrowserLoginActivity : ComponentActivity() {
         }
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                progress.progress = newProgress
-                progress.visibility = if (newProgress < 100) View.VISIBLE else View.INVISIBLE
+                loadProgress = newProgress
             }
         }
         webView.loadUrl(LOGIN_URL)
@@ -84,14 +106,30 @@ class BrowserLoginActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = goBackOrFinish()
         })
+
+        val settings = SettingsStore(this).load()
+        setContent {
+            AndronitorTheme(
+                themeMode = settings.themeMode,
+                dynamicColor = settings.dynamicColor,
+            ) {
+                LoginContent(
+                    webView = webView,
+                    progress = loadProgress,
+                    error = errorMessage,
+                    onErrorShown = { errorMessage = null },
+                    onBack = ::goBackOrFinish,
+                    onUseSession = ::returnSession,
+                )
+            }
+        }
     }
 
     private fun returnSession() {
         val cookieManager = CookieManager.getInstance()
         val cookie = cookieManager.getCookie("https://x.com").orEmpty()
         if (!cookie.contains("auth_token=") || !cookie.contains("twid=")) {
-            error.setText(R.string.login_first_error)
-            error.visibility = View.VISIBLE
+            errorMessage = getString(R.string.login_first_error)
             return
         }
         cookieManager.flush()
@@ -124,5 +162,58 @@ class BrowserLoginActivity : ComponentActivity() {
     companion object {
         const val EXTRA_COOKIE = "browser_login_cookie"
         private const val LOGIN_URL = "https://x.com/i/flow/login"
+    }
+}
+
+@Composable
+private fun LoginContent(
+    webView: WebView,
+    progress: Int,
+    error: String?,
+    onErrorShown: () -> Unit,
+    onBack: () -> Unit,
+    onUseSession: () -> Unit,
+) {
+    val snackbarHost = remember { SnackbarHostState() }
+    if (error != null) {
+        LaunchedEffect(error) {
+            snackbarHost.showSnackbar(error)
+            onErrorShown()
+        }
+    }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.browser_login)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            stringResource(R.string.browser_back),
+                        )
+                    }
+                },
+                actions = {
+                    TextButton(onClick = onUseSession) {
+                        Text(stringResource(R.string.use_session))
+                    }
+                },
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHost) },
+        containerColor = MaterialTheme.colorScheme.background,
+    ) { padding ->
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
+            // The WebView is owned by the activity so its lifecycle callbacks and
+            // cookie flushing keep working exactly as before.
+            AndroidView(factory = { webView }, modifier = Modifier.fillMaxSize())
+            AnimatedVisibility(visible = progress in 1..99) {
+                WavyLinearProgress(progress = { progress / 100f })
+            }
+        }
     }
 }
