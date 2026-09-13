@@ -70,8 +70,8 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.5.0-alpha25")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
-    implementation("androidx.room:room-runtime:2.8.4")
-    implementation("androidx.room:room-ktx:2.8.4")
+    implementation("androidx.room:room-runtime:2.8.5")
+    implementation("androidx.room:room-ktx:2.8.5")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     implementation("com.squareup.okhttp3:okhttp:5.5.0")
     implementation("com.squareup.moshi:moshi:1.15.2")
@@ -85,7 +85,7 @@ dependencies {
     // Modern LSPosed service: lets the app talk to the framework (request scope,
     // etc.). Bundled — it is a client library, not framework-provided like the API.
     implementation("io.github.libxposed:service:102.0.0")
-    ksp("androidx.room:room-compiler:2.8.4")
+    ksp("androidx.room:room-compiler:2.8.5")
     testImplementation("junit:junit:4.13.2")
     // Real org.json for local unit tests — the android.jar variant is a stub.
     testImplementation("org.json:json:20260814")
